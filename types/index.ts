@@ -30,6 +30,15 @@ export interface LessonProgress {
   completedAt: string | null;
 }
 
+export interface Lesson {
+  id: string;
+  name: string;
+  unit: number;
+  market: MarketId | 'shared';
+  xpReward: number;
+  questions: Question[];
+}
+
 export interface Question {
   id: string;
   type: 'multiple_choice' | 'tap_the_word' | 'fill_in_blank' | 'scenario';
