@@ -5,6 +5,7 @@ import { getPipStage } from '../constants/pip';
 interface UserState {
   user: User | null;
   isAuthenticated: boolean;
+  pendingMarket: MarketId;
 
   setUser: (user: User) => void;
   clearUser: () => void;
@@ -19,6 +20,7 @@ interface UserState {
 export const useUserStore = create<UserState>((set) => ({
   user: null,
   isAuthenticated: false,
+  pendingMarket: 'india',
 
   setUser: (user) => set({ user, isAuthenticated: true }),
 
@@ -26,6 +28,7 @@ export const useUserStore = create<UserState>((set) => ({
 
   setMarket: (market) =>
     set((state) => ({
+      pendingMarket: market,
       user: state.user ? { ...state.user, market } : null,
     })),
 
