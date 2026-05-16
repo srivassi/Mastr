@@ -6,6 +6,7 @@ interface UserState {
   user: User | null;
   isAuthenticated: boolean;
   pendingMarket: MarketId;
+  completedLessons: string[];
 
   setUser: (user: User) => void;
   clearUser: () => void;
@@ -15,12 +16,14 @@ interface UserState {
   refillHearts: () => void;
   incrementStreak: () => void;
   resetStreak: () => void;
+  markLessonComplete: (lessonId: string) => void;
 }
 
 export const useUserStore = create<UserState>((set) => ({
   user: null,
   isAuthenticated: false,
   pendingMarket: 'india',
+  completedLessons: [],
 
   setUser: (user) => set({ user, isAuthenticated: true }),
 
@@ -62,14 +65,28 @@ export const useUserStore = create<UserState>((set) => ({
     })),
 
   incrementStreak: () =>
-    set((state) => ({
-      user: state.user
-        ? { ...state.user, streakDays: state.user.streakDays + 1 }
-        : null,
-    })),
+    set((state) => {
+      if (!state.user) return state;
+      const today = new Date().toISOString().split('T')[0];
+      if (state.user.lastActive === today) return state;
+      return {
+        user: {
+          ...state.user,
+          streakDays: state.user.streakDays + 1,
+          lastActive: today,
+        },
+      };
+    }),
 
   resetStreak: () =>
     set((state) => ({
       user: state.user ? { ...state.user, streakDays: 0 } : null,
+    })),
+
+  markLessonComplete: (lessonId) =>
+    set((state) => ({
+      completedLessons: state.completedLessons.includes(lessonId)
+        ? state.completedLessons
+        : [...state.completedLessons, lessonId],
     })),
 }));

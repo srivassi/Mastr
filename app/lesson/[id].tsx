@@ -74,9 +74,11 @@ export default function LessonScreen() {
       router.replace({
         pathname: '/lesson/complete',
         params: {
-          xp:      String(xp),
-          correct: String(correctCount),
-          total:   String(lesson.questions.length),
+          lessonId: lesson.id,
+          isQuiz:   String(lesson.id.endsWith('-quiz')),
+          xp:       String(xp),
+          correct:  String(correctCount),
+          total:    String(lesson.questions.length),
         },
       });
       return;
