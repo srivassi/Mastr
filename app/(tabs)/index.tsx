@@ -3,14 +3,15 @@ import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useUserStore } from '../../store/userStore';
-import { computePath } from '../../lib/curriculum';
+import { computePath, getCurriculum, getCodrCurriculum } from '../../lib/curriculum';
 import { MARKETS } from '../../constants/markets';
+import { LANGUAGES } from '../../constants/languages';
 import { colors, spacing, typography } from '../../constants/theme';
 import UnitHeader from '../../components/path/UnitHeader';
 import PathNode from '../../components/path/PathNode';
 import PathTooltip from '../../components/path/PathTooltip';
 import type { PathNode as PathNodeType } from '../../lib/curriculum';
-import type { MarketId } from '../../types';
+import type { MarketId, LanguageId } from '../../types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const NODE_SIZE    = 72;
@@ -54,12 +55,26 @@ function PathConnector({ fromIndex, complete }: { fromIndex: number; complete: b
 export default function LearnScreen() {
   const user             = useUserStore((s) => s.user);
   const completedLessons = useUserStore((s) => s.completedLessons);
+  const pendingTrack     = useUserStore((s) => s.pendingTrack);
+  const pendingMarket    = useUserStore((s) => s.pendingMarket);
+  const pendingLanguage  = useUserStore((s) => s.pendingLanguage);
   const setMarket        = useUserStore((s) => s.setMarket);
-  const [selectedNode, setSelectedNode]       = useState<PathNodeType | null>(null);
-  const [marketPickerOpen, setMarketPickerOpen] = useState(false);
+  const setLanguage      = useUserStore((s) => s.setLanguage);
+  const [selectedNode, setSelectedNode]         = useState<PathNodeType | null>(null);
+  const [pickerOpen, setPickerOpen]             = useState(false);
 
-  const market = (user?.market ?? 'india') as MarketId;
-  const path   = useMemo(() => computePath(completedLessons, market), [completedLessons, market]);
+  const track    = user?.track    ?? pendingTrack;
+  const market   = (user?.market  ?? pendingMarket) as MarketId;
+  const language = (user?.language ?? pendingLanguage) as LanguageId;
+
+  const curriculum = useMemo(
+    () => track === 'codr' ? getCodrCurriculum(language) : getCurriculum(market),
+    [track, market, language],
+  );
+  const path = useMemo(
+    () => computePath(completedLessons, curriculum),
+    [completedLessons, curriculum],
+  );
 
   const streak = user?.streakDays ?? 0;
   const hearts = user?.hearts     ?? 5;
@@ -70,16 +85,23 @@ export default function LearnScreen() {
     router.push(`/lesson/${lessonId}`);
   }
 
+  const pickerLabel = track === 'codr'
+    ? `${LANGUAGES[language].icon}  ${LANGUAGES[language].label}  ▾`
+    : `${MARKETS[market].flag}  ${MARKETS[market].label}  ▾`;
+
+  const pickerTitle = track === 'codr' ? 'Choose your language' : 'Choose your market';
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Single header bar */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.marketBtn}
-          onPress={() => setMarketPickerOpen(true)}
+          onPress={() => setPickerOpen(true)}
           activeOpacity={0.7}
+          accessibilityLabel={pickerTitle}
         >
-          <Text style={styles.marketBtnText}>{MARKETS[market].flag}  {MARKETS[market].label}  ▾</Text>
+          <Text style={styles.marketBtnText}>{pickerLabel}</Text>
         </TouchableOpacity>
 
         <View style={styles.stats}>
@@ -101,26 +123,43 @@ export default function LearnScreen() {
 
       <View style={styles.divider} />
 
-      {/* Market picker modal */}
-      <Modal visible={marketPickerOpen} transparent animationType="slide" onRequestClose={() => setMarketPickerOpen(false)}>
-        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setMarketPickerOpen(false)}>
+      {/* Market / Language picker modal */}
+      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setPickerOpen(false)}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Choose your market</Text>
-            {(Object.values(MARKETS) as typeof MARKETS[MarketId][]).map((m) => (
-              <TouchableOpacity
-                key={m.id}
-                style={[styles.marketOption, market === m.id && styles.marketOptionActive]}
-                onPress={() => { setMarket(m.id as MarketId); setMarketPickerOpen(false); }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.marketOptionFlag}>{m.flag}</Text>
-                <Text style={[styles.marketOptionLabel, market === m.id && styles.marketOptionLabelActive]}>
-                  {m.label}
-                </Text>
-                {market === m.id && <Text style={styles.tick}>✓</Text>}
-              </TouchableOpacity>
-            ))}
+            <Text style={styles.modalTitle}>{pickerTitle}</Text>
+
+            {track === 'tradr'
+              ? (Object.values(MARKETS) as typeof MARKETS[MarketId][]).map((m) => (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[styles.marketOption, market === m.id && styles.marketOptionActive]}
+                    onPress={() => { setMarket(m.id as MarketId); setPickerOpen(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.marketOptionFlag}>{m.flag}</Text>
+                    <Text style={[styles.marketOptionLabel, market === m.id && styles.marketOptionLabelActive]}>
+                      {m.label}
+                    </Text>
+                    {market === m.id && <Text style={styles.tick}>✓</Text>}
+                  </TouchableOpacity>
+                ))
+              : (Object.values(LANGUAGES) as typeof LANGUAGES[LanguageId][]).map((l) => (
+                  <TouchableOpacity
+                    key={l.id}
+                    style={[styles.marketOption, language === l.id && styles.marketOptionActive]}
+                    onPress={() => { setLanguage(l.id as LanguageId); setPickerOpen(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.marketOptionFlag}>{l.icon}</Text>
+                    <Text style={[styles.marketOptionLabel, language === l.id && styles.marketOptionLabelActive]}>
+                      {l.label}
+                    </Text>
+                    {language === l.id && <Text style={styles.tick}>✓</Text>}
+                  </TouchableOpacity>
+                ))
+            }
           </View>
         </TouchableOpacity>
       </Modal>

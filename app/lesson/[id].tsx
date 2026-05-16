@@ -62,6 +62,8 @@ export default function LessonScreen() {
   }
 
   function handleContinue() {
+    if (!lesson) return;
+
     if (hearts === 0 && answerState === 'wrong') {
       router.replace('/(tabs)');
       return;

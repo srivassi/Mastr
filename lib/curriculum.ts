@@ -1,4 +1,4 @@
-import type { MarketId } from '../types';
+import type { MarketId, LanguageId } from '../types';
 
 export const QUIZ_PASS_THRESHOLD = 0.7;
 
@@ -169,9 +169,120 @@ export function getCurriculum(market: MarketId): CurriculumUnit[] {
   return [...SHARED_UNITS, ...MARKET_UNITS[market]];
 }
 
-export function computePath(completedLessons: string[], market: MarketId): PathUnit[] {
+// ─── Codr Curriculum ─────────────────────────────────────────────────────────
+
+const CODR_SHARED_UNITS: CurriculumUnit[] = [
+  {
+    id: 'codr-unit1',
+    title: 'Arrays & Hashing',
+    lessons: [
+      { id: 'codr1-lesson1', name: 'What is a Hash Map?',          xpReward: 25, questionCount: 5 },
+      { id: 'codr1-lesson2', name: 'Two Sum Pattern',              xpReward: 25, questionCount: 4 },
+      { id: 'codr1-lesson3', name: 'Frequency Counts',             xpReward: 25, questionCount: 4 },
+      { id: 'codr1-lesson4', name: 'Prefix Sums',                  xpReward: 30, questionCount: 4 },
+      { id: 'codr1-quiz',    name: 'Unit 1 Quiz',                  xpReward: 50, questionCount: 5, isQuiz: true },
+    ],
+  },
+  {
+    id: 'codr-unit2',
+    title: 'Two Pointers & Sliding Window',
+    lessons: [
+      { id: 'codr2-lesson1', name: 'Two Pointers: Opposite Ends',  xpReward: 25, questionCount: 4 },
+      { id: 'codr2-lesson2', name: 'Two Pointers: Fast & Slow',    xpReward: 25, questionCount: 4 },
+      { id: 'codr2-lesson3', name: 'Fixed-Size Sliding Window',    xpReward: 25, questionCount: 5 },
+      { id: 'codr2-lesson4', name: 'Variable-Size Window',         xpReward: 30, questionCount: 5 },
+      { id: 'codr2-quiz',    name: 'Unit 2 Quiz',                  xpReward: 50, questionCount: 6, isQuiz: true },
+    ],
+  },
+  {
+    id: 'codr-unit3',
+    title: 'Stack & Queue',
+    lessons: [
+      { id: 'codr3-lesson1', name: 'Stack: LIFO & Use Cases',      xpReward: 25, questionCount: 4 },
+      { id: 'codr3-lesson2', name: 'Monotonic Stack',              xpReward: 25, questionCount: 5 },
+      { id: 'codr3-lesson3', name: 'Queue & Deque',                xpReward: 25, questionCount: 4 },
+      { id: 'codr3-lesson4', name: 'Valid Parentheses Pattern',    xpReward: 25, questionCount: 4 },
+      { id: 'codr3-quiz',    name: 'Unit 3 Quiz',                  xpReward: 50, questionCount: 5, isQuiz: true },
+    ],
+  },
+  {
+    id: 'codr-unit4',
+    title: 'Binary Search',
+    lessons: [
+      { id: 'codr4-lesson1', name: 'Binary Search Fundamentals',   xpReward: 25, questionCount: 4 },
+      { id: 'codr4-lesson2', name: 'Search in Rotated Array',      xpReward: 25, questionCount: 4 },
+      { id: 'codr4-lesson3', name: 'Finding Boundaries',           xpReward: 30, questionCount: 4 },
+      { id: 'codr4-quiz',    name: 'Unit 4 Quiz',                  xpReward: 50, questionCount: 5, isQuiz: true },
+    ],
+  },
+  {
+    id: 'codr-unit5',
+    title: 'Trees & Recursion',
+    lessons: [
+      { id: 'codr5-lesson1', name: 'Binary Tree Traversal',        xpReward: 25, questionCount: 5 },
+      { id: 'codr5-lesson2', name: 'DFS on Trees',                 xpReward: 25, questionCount: 4 },
+      { id: 'codr5-lesson3', name: 'BFS & Level Order',            xpReward: 25, questionCount: 4 },
+      { id: 'codr5-lesson4', name: 'Binary Search Tree',           xpReward: 30, questionCount: 4 },
+      { id: 'codr5-quiz',    name: 'Unit 5 Quiz',                  xpReward: 50, questionCount: 6, isQuiz: true },
+    ],
+  },
+];
+
+const LANGUAGE_UNITS: Record<LanguageId, CurriculumUnit[]> = {
+  python: [
+    {
+      id: 'codr-unit6-python',
+      title: 'Python Patterns',
+      lessons: [
+        { id: 'codr6py-lesson1', name: 'List & Dict Comprehensions',         xpReward: 25, questionCount: 4 },
+        { id: 'codr6py-lesson2', name: 'collections.Counter & defaultdict',  xpReward: 25, questionCount: 4 },
+        { id: 'codr6py-lesson3', name: 'heapq & Priority Queue',             xpReward: 25, questionCount: 4 },
+        { id: 'codr6py-lesson4', name: 'itertools Tricks',                   xpReward: 25, questionCount: 4 },
+        { id: 'codr6py-quiz',    name: 'Unit 6 Quiz',                        xpReward: 50, questionCount: 5, isQuiz: true },
+      ],
+    },
+    {
+      id: 'codr-unit7-python',
+      title: 'Pythonic Problem Solving',
+      lessons: [
+        { id: 'codr7py-lesson1', name: 'String Manipulation in Python',  xpReward: 25, questionCount: 4 },
+        { id: 'codr7py-lesson2', name: 'Lambda & Functional Patterns',   xpReward: 25, questionCount: 4 },
+        { id: 'codr7py-lesson3', name: 'Time & Space Complexity in Python', xpReward: 30, questionCount: 5 },
+        { id: 'codr7py-quiz',    name: 'Unit 7 Quiz',                    xpReward: 50, questionCount: 5, isQuiz: true },
+      ],
+    },
+  ],
+  java: [
+    {
+      id: 'codr-unit6-java',
+      title: 'Java Patterns',
+      lessons: [
+        { id: 'codr6ja-lesson1', name: 'HashMap & HashSet',            xpReward: 25, questionCount: 4 },
+        { id: 'codr6ja-lesson2', name: 'PriorityQueue & TreeMap',      xpReward: 25, questionCount: 4 },
+        { id: 'codr6ja-lesson3', name: 'Interfaces & Generics',        xpReward: 25, questionCount: 4 },
+        { id: 'codr6ja-lesson4', name: 'ArrayDeque vs LinkedList',     xpReward: 25, questionCount: 4 },
+        { id: 'codr6ja-quiz',    name: 'Unit 6 Quiz',                  xpReward: 50, questionCount: 5, isQuiz: true },
+      ],
+    },
+    {
+      id: 'codr-unit7-java',
+      title: 'Java Problem Solving',
+      lessons: [
+        { id: 'codr7ja-lesson1', name: 'String Manipulation in Java',    xpReward: 25, questionCount: 4 },
+        { id: 'codr7ja-lesson2', name: 'Comparable & Comparator',        xpReward: 25, questionCount: 4 },
+        { id: 'codr7ja-lesson3', name: 'Time & Space Complexity in Java', xpReward: 30, questionCount: 5 },
+        { id: 'codr7ja-quiz',    name: 'Unit 7 Quiz',                    xpReward: 50, questionCount: 5, isQuiz: true },
+      ],
+    },
+  ],
+};
+
+export function getCodrCurriculum(language: LanguageId): CurriculumUnit[] {
+  return [...CODR_SHARED_UNITS, ...LANGUAGE_UNITS[language]];
+}
+
+export function computePath(completedLessons: string[], curriculum: CurriculumUnit[]): PathUnit[] {
   const completed = new Set(completedLessons);
-  const curriculum = getCurriculum(market);
   let activeAssigned = false;
   let prevUnitQuizPassed = true; // unit 1 is always accessible
 
