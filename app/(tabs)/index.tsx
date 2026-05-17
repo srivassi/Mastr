@@ -109,11 +109,9 @@ export default function LearnScreen() {
             <Text style={styles.statIcon}>🔥</Text>
             <Text style={styles.statValue}>{streak}</Text>
           </View>
-          <View style={styles.hearts}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Text key={i} style={i < hearts ? styles.heart : styles.heartEmpty}>♥</Text>
-            ))}
-          </View>
+          <Text style={styles.heartsLabel} accessibilityLabel={`${hearts} hearts remaining`}>
+            {hearts}♥
+          </Text>
           <View style={styles.stat}>
             <Text style={styles.statIcon}>⚡</Text>
             <Text style={styles.statValue}>{xp}</Text>
@@ -219,11 +217,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   stat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statIcon:   { fontSize: 20 },
-  statValue:  { fontSize: typography.base, fontWeight: '800', color: colors.textPrimary },
-  hearts:     { flexDirection: 'row', gap: 2 },
-  heart:      { fontSize: 16, color: colors.danger },
-  heartEmpty: { fontSize: 16, color: colors.border },
+  statIcon:    { fontSize: 20 },
+  statValue:   { fontSize: typography.base, fontWeight: '800', color: colors.textPrimary },
+  heartsLabel: { fontSize: 16, fontWeight: '700', color: colors.danger },
 
   divider: { height: 1, backgroundColor: colors.border },
 
