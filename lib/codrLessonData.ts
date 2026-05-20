@@ -272,6 +272,15 @@ const CODR_LESSONS: Lesson[] = [
       {
         id: 'codr2-lesson1-q1', type: 'multiple_choice',
         question: 'In the two-pointer technique on a sorted array, where do the pointers typically start?',
+        arrayData: {
+          title: 'SORTED ARRAY — initial pointer positions',
+          elements: [
+            { value: 2,  highlight: 'primary',   pointer: 'left'  },
+            { value: 7,  highlight: 'inactive' },
+            { value: 11, highlight: 'inactive' },
+            { value: 15, highlight: 'secondary', pointer: 'right' },
+          ],
+        },
         options: ['Both at index 0', 'One at the start, one at the end', 'Both at the middle', 'One at the start, one at the middle'],
         correct: 1,
         explanationShort: 'Opposite-end pointers work because the sorted array lets you decide which pointer to move based on the current sum vs target.',
@@ -288,6 +297,15 @@ const CODR_LESSONS: Lesson[] = [
       {
         id: 'codr2-lesson1-q3', type: 'multiple_choice',
         question: 'In the sorted Two Sum problem with two pointers, when do you move the left pointer right?',
+        arrayData: {
+          title: 'CURRENT STATE — target = 20, sum = 2 + 15 = 17',
+          elements: [
+            { value: 2,  highlight: 'primary',   pointer: 'left'  },
+            { value: 7,  highlight: 'inactive' },
+            { value: 11, highlight: 'inactive' },
+            { value: 15, highlight: 'secondary', pointer: 'right' },
+          ],
+        },
         options: [
           'When the sum equals the target',
           'When the sum is greater than the target',
@@ -319,7 +337,17 @@ const CODR_LESSONS: Lesson[] = [
     questions: [
       {
         id: 'codr2-lesson2-q1', type: 'multiple_choice',
-        question: 'Floyd\'s cycle detection uses fast and slow pointers. How fast does each move?',
+        question: "Floyd's cycle detection uses fast and slow pointers. How fast does each move?",
+        arrayData: {
+          title: 'AFTER 1 STEP — linked list [1→2→3→4→5]',
+          elements: [
+            { value: 1, highlight: 'inactive' },
+            { value: 2, highlight: 'primary',   pointer: 'slow' },
+            { value: 3, highlight: 'secondary', pointer: 'fast' },
+            { value: 4, highlight: 'inactive' },
+            { value: 5, highlight: 'inactive' },
+          ],
+        },
         options: [
           'Both move 1 step at a time',
           'Slow moves 1 step, fast moves 2 steps',
@@ -394,6 +422,17 @@ const CODR_LESSONS: Lesson[] = [
       {
         id: 'codr2-lesson3-q3', type: 'multiple_choice',
         question: 'When sliding a window of size k one step right, what two operations update the sum?',
+        arrayData: {
+          title: 'k = 3 — sliding one step right',
+          elements: [
+            { value: 4, highlight: 'secondary', pointer: 'leave' },
+            { value: 2, highlight: 'window' },
+            { value: 1, highlight: 'window' },
+            { value: 7, highlight: 'window' },
+            { value: 8, highlight: 'primary',   pointer: 'enter' },
+            { value: 2, highlight: 'inactive' },
+          ],
+        },
         options: [
           'Recompute the entire window sum from scratch',
           'Add the incoming element, subtract the outgoing element',

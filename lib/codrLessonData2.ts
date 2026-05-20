@@ -41,6 +41,17 @@ const CODR_LESSONS_2: Lesson[] = [
       {
         id: 'codr4-lesson1-q4', type: 'multiple_choice',
         question: 'The standard template: target < `nums[mid]`. Which line runs next?',
+        arrayData: {
+          title: 'SORTED ARRAY — target = 6, mid points at 9',
+          elements: [
+            { value: 1,  highlight: 'inactive' },
+            { value: 3,  highlight: 'inactive' },
+            { value: 5,  highlight: 'inactive' },
+            { value: 9,  highlight: 'secondary', pointer: 'mid'   },
+            { value: 12, highlight: 'inactive' },
+            { value: 15, highlight: 'inactive' },
+          ],
+        },
         codeSnippet: 'left, right = 0, len(nums) - 1\nwhile left <= right:\n    mid = left + (right - left) // 2\n    if nums[mid] == target:\n        return mid\n    elif nums[mid] < target:\n        left = mid + 1\n    else:\n        ???  # target < nums[mid]',
         codeLanguage: 'python',
         options: ['right = mid + 1', 'left = mid + 1', 'right = mid - 1', 'left = mid - 1'],
@@ -223,6 +234,24 @@ const CODR_LESSONS_2: Lesson[] = [
       {
         id: 'codr5-lesson1-q1', type: 'multiple_choice',
         question: 'In-order traversal of a Binary Search Tree visits nodes in what order?',
+        treeData: {
+          title: 'BST — what order does in-order visit these nodes?',
+          root: {
+            value: 4,
+            left: {
+              value: 2,
+              left:  { value: 1, highlight: 'visited' },
+              right: { value: 3, highlight: 'visited' },
+              highlight: 'visited',
+            },
+            right: {
+              value: 6,
+              left:  { value: 5 },
+              right: { value: 7 },
+            },
+            highlight: 'visited',
+          },
+        },
         options: ['Random order', 'Root, left subtree, right subtree', 'Ascending sorted order', 'Descending sorted order'],
         correct: 2,
         explanationShort: 'In-order = left → root → right. In a BST (left < root < right), this always produces ascending order.',
@@ -282,6 +311,19 @@ const CODR_LESSONS_2: Lesson[] = [
       {
         id: 'codr5-lesson2-q2', type: 'multiple_choice',
         question: 'Finding max depth of a binary tree with DFS — what do you return at each node?',
+        treeData: {
+          title: 'TREE — what is the max depth?',
+          root: {
+            value: 1,
+            highlight: 'primary',
+            left: {
+              value: 2,
+              left:  { value: 4, highlight: 'visited' },
+              right: { value: 5, highlight: 'visited' },
+            },
+            right: { value: 3 },
+          },
+        },
         options: [
           '1 + depth of left subtree only',
           '1 + max(depth of left, depth of right)',
@@ -322,6 +364,22 @@ const CODR_LESSONS_2: Lesson[] = [
       {
         id: 'codr5-lesson3-q1', type: 'multiple_choice',
         question: 'BFS on a binary tree — what do you add to the queue first?',
+        treeData: {
+          title: 'TREE — BFS starts here',
+          root: {
+            value: 1,
+            highlight: 'primary',
+            left: {
+              value: 2,
+              left:  { value: 4 },
+              right: { value: 5 },
+            },
+            right: {
+              value: 3,
+              right: { value: 6 },
+            },
+          },
+        },
         options: ['The left-most leaf', 'The root', 'All leaves simultaneously', 'The deepest node'],
         correct: 1,
         explanationShort: 'BFS starts at the root (level 0) and expands outward. The root is the only node at level 0.',
@@ -365,6 +423,22 @@ const CODR_LESSONS_2: Lesson[] = [
       {
         id: 'codr5-lesson4-q1', type: 'multiple_choice',
         question: 'In a valid BST, what must be true for EVERY node (not just direct children)?',
+        treeData: {
+          title: 'VALID BST — the rule applies to every node',
+          root: {
+            value: 8,
+            highlight: 'primary',
+            left: {
+              value: 3,
+              left:  { value: 1, highlight: 'visited' },
+              right: { value: 6, highlight: 'visited' },
+            },
+            right: {
+              value: 10,
+              right: { value: 14, highlight: 'visited' },
+            },
+          },
+        },
         options: [
           'Left child < node < right child',
           'All nodes in left subtree < node AND all nodes in right subtree > node',

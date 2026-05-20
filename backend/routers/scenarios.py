@@ -1,10 +1,16 @@
+import json
+import logging
+from datetime import date
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Curated daily scenarios per market — rotated by day-of-week
-_DAILY_SCENARIOS: dict[str, list[dict]] = {
+# ─── Hardcoded fallback (used when Supabase has no scenarios yet) ─────────────
+
+_FALLBACK_SCENARIOS: dict[str, list[dict]] = {
     "india": [
         {
             "id": "india-rbi-hold",
@@ -55,8 +61,7 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "correct": 1,
             "explanation_short": (
                 "When FIIs sell Indian stocks, they receive rupees. To send money home, "
-                "they sell those rupees and buy dollars — increasing dollar demand and weakening the rupee. "
-                "Simultaneous stock and currency selling creates a double pressure."
+                "they sell those rupees and buy dollars — increasing dollar demand and weakening the rupee."
             ),
             "difficulty": 2,
             "tags": ["fii", "rupee", "currency"],
@@ -79,8 +84,7 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "correct": 1,
             "explanation_short": (
                 "SEBI's own data showed 93% of retail F&O traders lost money. Higher lot sizes "
-                "mean traders need more capital, pricing out smaller retail participants who are statistically "
-                "most likely to lose to algorithms and institutions."
+                "price out smaller retail participants who are statistically most likely to lose."
             ),
             "difficulty": 2,
             "tags": ["sebi", "regulation", "derivatives"],
@@ -89,8 +93,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "id": "india-it-results",
             "market": "india",
             "context": (
-                "Infosys just reported Q4 results: revenue grew 5.1% YoY (in rupee terms) but only "
-                "2.3% in constant currency. The CEO guided for 4–7% revenue growth in FY26. "
+                "Infosys just reported Q4 results: revenue grew 5.1% YoY but only 2.3% in constant currency. "
+                "The CEO guided for 4–7% revenue growth in FY26. "
                 "Analysts had expected 6–8% guidance. The stock is down 6% on the day."
             ),
             "question": "Why does the market react negatively even though Infosys grew its revenue?",
@@ -103,8 +107,7 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "correct": 1,
             "explanation_short": (
                 "Markets are forward-looking. The past quarter was fine, but the 4–7% guidance "
-                "disappointed those expecting 6–8%. Analysts will now revise their models lower, "
-                "reducing their target prices — which is why the stock sold off."
+                "disappointed those expecting 6–8%. Analysts will revise their models lower."
             ),
             "media_literacy_note": (
                 "Headlines will say 'Infosys CRASHES on results'. The stock fell 6% — significant, "
@@ -117,9 +120,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "id": "india-nifty-ath",
             "market": "india",
             "context": (
-                "The Nifty 50 has hit an all-time high of 24,500. P/E ratio of the index stands at 24x "
-                "vs its 10-year average of 20x. Retail investor demat accounts have grown from 40M to 160M "
-                "in 4 years. Social media is full of posts about stock market success stories."
+                "The Nifty 50 has hit an all-time high of 24,500. P/E ratio stands at 24x "
+                "vs its 10-year average of 20x. Retail demat accounts have grown from 40M to 160M in 4 years."
             ),
             "question": "The Nifty is at an all-time high with a premium valuation. What should a disciplined investor be thinking?",
             "options": [
@@ -131,12 +133,11 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "correct": 2,
             "explanation_short": (
                 "High P/E doesn't guarantee a crash — valuations can stay elevated for years. "
-                "But at 24x vs a 20x average, expected future returns are lower. Disciplined investors "
-                "don't time the market, but they do size positions appropriately given risk."
+                "But at 24x vs a 20x average, expected future returns are lower."
             ),
             "media_literacy_note": (
                 "Retail participation surging is historically a late-cycle signal, not a bullish one — "
-                "retail enters last, near peaks. This doesn't mean 'sell everything', but 'be thoughtful'."
+                "retail enters last, near peaks."
             ),
             "difficulty": 3,
             "tags": ["valuation", "pe-ratio", "market-timing"],
@@ -145,9 +146,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "id": "india-inflation",
             "market": "india",
             "context": (
-                "India's retail inflation (CPI) rose to 6.8%, above the RBI's 6% upper tolerance band "
-                "for the second consecutive month. Vegetable prices are up 28% YoY. "
-                "The 10-year government bond yield has risen to 7.4%."
+                "India's CPI rose to 6.8%, above the RBI's 6% upper tolerance band for the second month. "
+                "Vegetable prices are up 28% YoY. The 10-year government bond yield has risen to 7.4%."
             ),
             "question": "Why did the government bond yield rise when CPI came in above expectations?",
             "options": [
@@ -158,9 +158,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             ],
             "correct": 1,
             "explanation_short": (
-                "Bond yields rise when investors demand higher compensation for holding fixed-rate debt "
-                "during inflation. High CPI also signals the RBI can't cut rates — possibly needs to hike — "
-                "which reduces bond prices and pushes yields up."
+                "Bond yields rise when investors demand higher compensation during inflation. "
+                "High CPI also signals the RBI can't cut — it may need to hike — reducing bond prices."
             ),
             "difficulty": 3,
             "tags": ["inflation", "bonds", "rbi"],
@@ -169,9 +168,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "id": "india-dii-support",
             "market": "india",
             "context": (
-                "As FIIs sold ₹30,000 crore of Indian equities last month, Domestic Institutional Investors "
-                "(DIIs) — primarily mutual funds via SIP inflows — bought ₹28,000 crore. "
-                "The Nifty fell only 1.8% despite the heavy foreign selling."
+                "As FIIs sold ₹30,000 crore of Indian equities last month, DIIs — primarily mutual funds "
+                "via SIP inflows — bought ₹28,000 crore. The Nifty fell only 1.8% despite the heavy foreign selling."
             ),
             "question": "What role did DIIs play in limiting the market's decline during the FII sell-off?",
             "options": [
@@ -182,9 +180,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             ],
             "correct": 1,
             "explanation_short": (
-                "When FIIs sell and DIIs buy, the selling pressure is absorbed. ₹28,000 crore of DII "
-                "buying offset ₹30,000 crore of FII selling — only ₹2,000 crore of net selling hit the market. "
-                "SIP-driven DII flows have become a structural buffer for Indian equities."
+                "₹28,000 crore of DII buying offset ₹30,000 crore of FII selling — "
+                "only ₹2,000 crore of net selling hit the market. SIP-driven DII flows are a structural buffer."
             ),
             "difficulty": 2,
             "tags": ["fii", "dii", "flows"],
@@ -196,7 +193,7 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "market": "us",
             "context": (
                 "The Federal Reserve raised rates by 25bps to 5.5%, in line with expectations. "
-                "In the press conference, Chair Powell said 'we may need to keep rates higher for longer'. "
+                "In the press conference, Powell said 'we may need to keep rates higher for longer'. "
                 "The S&P 500 fell 1.8% after initially rising on the in-line decision."
             ),
             "question": "Why did the S&P 500 fall after the in-line rate hike, when the hike itself was expected?",
@@ -208,13 +205,13 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             ],
             "correct": 1,
             "explanation_short": (
-                "The hike was priced in — no surprise there. But 'higher for longer' was more hawkish "
-                "than the market's expectation of cuts by year-end. Markets had to reprice: if rates stay "
-                "high longer, future earnings are discounted at a higher rate, reducing stock valuations."
+                "The hike was priced in. But 'higher for longer' was more hawkish than the market's "
+                "expectation of cuts by year-end. If rates stay high longer, future earnings are "
+                "discounted at a higher rate, reducing valuations."
             ),
             "media_literacy_note": (
-                "Headlines will read 'Stocks PLUNGE after Fed hike'. The actual mechanism: "
-                "one sentence in a press conference changed rate-cut expectations. That's the real story."
+                "Headlines read 'Stocks PLUNGE after Fed hike'. The actual mechanism: "
+                "one sentence in a press conference changed rate-cut expectations."
             ),
             "difficulty": 3,
             "tags": ["fed", "rates", "sp500"],
@@ -224,8 +221,7 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "market": "us",
             "context": (
                 "Nvidia reported quarterly revenue of $26B, 18% above analyst consensus of $22B. "
-                "EPS came in at $6.12 vs $5.16 expected. The stock jumped 12% after hours. "
-                "The company also announced a 10-for-1 stock split."
+                "EPS came in at $6.12 vs $5.16 expected. The stock jumped 12% after hours."
             ),
             "question": "Nvidia's stock jumped 12% after the results. Which factor most likely drove this?",
             "options": [
@@ -236,9 +232,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             ],
             "correct": 1,
             "explanation_short": (
-                "An 18% revenue beat is massive. It signals AI data centre demand is far stronger than "
-                "analysts modelled. Investors revise their future earnings estimates upward — "
-                "which raises target prices. The split is cosmetic and doesn't create real value."
+                "An 18% revenue beat signals AI data centre demand is far stronger than analysts modelled. "
+                "Investors revise future earnings estimates upward — which raises target prices."
             ),
             "difficulty": 2,
             "tags": ["earnings", "nvidia", "ai"],
@@ -247,9 +242,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "id": "us-cpi-surprise",
             "market": "us",
             "context": (
-                "US CPI came in at 3.5% — hotter than the 3.1% forecast. Core CPI (excluding food and energy) "
-                "was 3.8% vs 3.6% expected. The 10-year Treasury yield jumped from 4.3% to 4.6%. "
-                "The S&P 500 fell 1.2% on the day."
+                "US CPI came in at 3.5% — hotter than the 3.1% forecast. Core CPI was 3.8% vs 3.6% expected. "
+                "The 10-year Treasury yield jumped from 4.3% to 4.6%. The S&P 500 fell 1.2%."
             ),
             "question": "Why did Treasury yields rise sharply on the hotter-than-expected CPI print?",
             "options": [
@@ -260,9 +254,9 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             ],
             "correct": 1,
             "explanation_short": (
-                "Hot CPI = Fed will likely keep rates higher for longer (or hike again). "
-                "Existing bonds with lower yields become less attractive — investors sell them, "
-                "pushing prices down and yields up. Rate cut expectations for the year got pushed back."
+                "Hot CPI = Fed will likely keep rates higher for longer. "
+                "Existing bonds with lower yields become less attractive — investors sell, "
+                "pushing prices down and yields up."
             ),
             "difficulty": 3,
             "tags": ["cpi", "fed", "bonds", "yields"],
@@ -274,8 +268,7 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "market": "eu",
             "context": (
                 "The ECB cut rates by 25bps — its first rate cut in 5 years — as eurozone inflation "
-                "returned to 2.1%, near its 2% target. President Lagarde signalled the bank remains "
-                "'data dependent' and did not commit to further cuts. The EUR/USD fell 0.6%."
+                "returned to 2.1%. Lagarde signalled the bank remains 'data dependent'. The EUR/USD fell 0.6%."
             ),
             "question": "The euro weakened despite the ECB cutting rates. Why does a rate cut typically weaken a currency?",
             "options": [
@@ -287,8 +280,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "correct": 0,
             "explanation_short": (
                 "Higher interest rates attract foreign capital seeking better returns — boosting a currency. "
-                "Lower rates reduce this incentive. When the ECB cuts, euro deposits and bonds yield less, "
-                "so investors move capital to higher-yielding currencies like the dollar."
+                "Lower rates reduce this incentive. When the ECB cuts, euro assets yield less, "
+                "so investors move capital to higher-yielding currencies."
             ),
             "difficulty": 2,
             "tags": ["ecb", "currency", "euro"],
@@ -310,8 +303,8 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
             "correct": 1,
             "explanation_short": (
                 "The DAX represents Germany's largest exporters — Volkswagen, BASF, Siemens, SAP. "
-                "These companies earn the majority of their revenue outside Germany. "
-                "Strong global demand for German industrial and auto exports boosts their profits even when domestic Germany is weak."
+                "These companies earn the majority of their revenue outside Germany, "
+                "so strong global demand boosts profits even when domestic Germany is weak."
             ),
             "difficulty": 3,
             "tags": ["dax", "germany", "exports"],
@@ -320,41 +313,233 @@ _DAILY_SCENARIOS: dict[str, list[dict]] = {
 }
 
 
+# ─── Codr fallback scenarios ─────────────────────────────────────────────────
+
+_CODR_FALLBACK_SCENARIOS: list[dict] = [
+    {
+        "id": "codr-two-pointer-1",
+        "track": "codr",
+        "pattern": "Two Pointers",
+        "context": "You're given a sorted array [2, 7, 11, 15, 18, 22] and a target of 26. You need to find two numbers that sum to the target.",
+        "question": "Using the two-pointer approach, after the first step (left=0, right=5), sum=2+22=24 < 26. What do you do next?",
+        "options": [
+            "Move right pointer left (right--) because 24 is close enough",
+            "Move left pointer right (left++) to increase the sum",
+            "Move both pointers inward",
+            "Reset and try a different approach",
+        ],
+        "correct": 1,
+        "explanation_short": "Sum < target means we need a bigger sum. Moving left pointer right gives us a larger left value, increasing the sum. Moving right pointer left would decrease the sum.",
+        "difficulty": 2,
+        "tags": ["two-pointers", "arrays", "sorted"],
+    },
+    {
+        "id": "codr-sliding-window-1",
+        "track": "codr",
+        "pattern": "Sliding Window",
+        "context": "Find the maximum sum of a contiguous subarray of size 3 in [4, 2, 1, 7, 8, 1, 2, 8, 1, 0].",
+        "question": "When the window slides from [4,2,1] to [2,1,7], what is the O(1) operation to update the sum?",
+        "options": [
+            "Recompute the sum from scratch each time — O(k) per slide",
+            "Subtract the element leaving (4) and add the element entering (7)",
+            "Sort the window and take the first k elements",
+            "Use a heap to track the maximum element",
+        ],
+        "correct": 1,
+        "explanation_short": "Sliding window's key insight: new_sum = old_sum - left_out + right_in. This gives O(1) per step vs O(k) for recomputing. Total time: O(n) instead of O(n*k).",
+        "difficulty": 2,
+        "tags": ["sliding-window", "arrays"],
+    },
+    {
+        "id": "codr-binary-search-1",
+        "track": "codr",
+        "pattern": "Binary Search",
+        "context": "Binary search on sorted array [1, 3, 5, 7, 9, 11, 13, 15]. Target = 7. left=0, right=7.",
+        "question": "mid = (0+7)//2 = 3. arr[3] = 7. What should the function return?",
+        "options": [
+            "Return mid (index 3) — target found",
+            "Return arr[mid] (value 7) — that's the target value",
+            "Continue searching the left half",
+            "Continue searching the right half",
+        ],
+        "correct": 0,
+        "explanation_short": "When arr[mid] == target, return mid — the index, not the value. The caller wants to know WHERE in the array the element is, not the element itself (they already know the target value).",
+        "difficulty": 1,
+        "tags": ["binary-search", "arrays"],
+    },
+    {
+        "id": "codr-bfs-1",
+        "track": "codr",
+        "pattern": "BFS",
+        "context": "You're doing BFS on a graph. You're at node A, connected to B, C, D. You've visited A. Queue currently: [B, C, D].",
+        "question": "You dequeue B. B is connected to E and F (both unvisited) and A (visited). What happens next?",
+        "options": [
+            "Add E, F, A to the queue; mark all as visited",
+            "Add E, F to the queue and mark them visited; skip A since it's already visited",
+            "Stop — you found a node with 3 neighbours, which means a cycle",
+            "Restart BFS from B",
+        ],
+        "correct": 1,
+        "explanation_short": "BFS only enqueues unvisited neighbours. The visited check prevents infinite loops and re-processing. A is already visited so we skip it. E and F are new — add them and mark visited immediately (before dequeuing to avoid duplicate entries).",
+        "difficulty": 2,
+        "tags": ["bfs", "graphs"],
+    },
+    {
+        "id": "codr-complexity-1",
+        "track": "codr",
+        "pattern": "Complexity",
+        "context": "You have a nested loop: outer runs n times, inner runs log(n) times. Inside, a HashMap lookup takes O(1).",
+        "question": "What is the overall time complexity?",
+        "options": [
+            "O(n²) — two nested loops always means O(n²)",
+            "O(n log n) — outer is O(n), inner is O(log n), multiply them",
+            "O(n) — the HashMap makes the inner loop constant",
+            "O(log n) — the inner loop dominates",
+        ],
+        "correct": 1,
+        "explanation_short": "Nested loops multiply: n * log(n) = O(n log n). The HashMap lookup inside is O(1), so it doesn't change the outer product. Common mistake: assuming all nested loops are O(n²).",
+        "difficulty": 2,
+        "tags": ["complexity", "big-o"],
+    },
+    {
+        "id": "codr-hashmap-1",
+        "track": "codr",
+        "pattern": "HashMap",
+        "context": "You need to find all pairs in [3, 1, 4, 1, 5, 9, 2, 6] that sum to 10. You're using a HashMap approach.",
+        "question": "For each element x, what do you check in the HashMap to find a valid pair?",
+        "options": [
+            "Check if x itself is in the HashMap",
+            "Check if (target - x) is in the HashMap",
+            "Check if (x * 2) equals the target",
+            "Check if the HashMap size is greater than x",
+        ],
+        "correct": 1,
+        "explanation_short": "If x + y = target, then y = target - x. For each element x, check if its complement (target - x) already exists in the map. If yes, you've found a pair. This gives O(n) time vs O(n²) for brute force.",
+        "difficulty": 1,
+        "tags": ["hashmap", "two-sum", "arrays"],
+    },
+    {
+        "id": "codr-stack-1",
+        "track": "codr",
+        "pattern": "Stack",
+        "context": "You're solving Valid Parentheses: '([{}])'. Processing character by character.",
+        "question": "You've processed '([{' and the stack is ['(', '[', '{']. You now encounter '}'. What should you do?",
+        "options": [
+            "Push '}' onto the stack",
+            "Pop '{' from the stack — the closing brace matches the top",
+            "Clear the entire stack — a closing brace means all open braces are closed",
+            "Return false — you can't have nested brackets",
+        ],
+        "correct": 1,
+        "explanation_short": "For Valid Parentheses, push opening brackets. When you see a closing bracket, check if the top of the stack is its matching opener. If yes, pop. If not, return false. The stack correctly tracks nesting depth.",
+        "difficulty": 1,
+        "tags": ["stack", "parentheses", "matching"],
+    },
+]
+
+
+# ─── Supabase helper ──────────────────────────────────────────────────────────
+
+async def _get_db_scenarios(market: str) -> list[dict]:
+    """Pull active generated scenarios from Supabase. Returns [] on any error."""
+    from database.supabase_client import get_client
+    try:
+        db = get_client()
+        result = (
+            db.table("scenarios")
+            .select("*")
+            .eq("market", market)
+            .eq("active", True)
+            .eq("track", "tradr")
+            .order("generated_at", desc=True)
+            .limit(21)  # 3 per week × 7 weeks of history
+            .execute()
+        )
+        rows: list[dict] = result.data or []
+        for row in rows:
+            if isinstance(row.get("options"), str):
+                row["options"] = json.loads(row["options"])
+        return rows
+    except Exception as exc:
+        logger.warning("Supabase scenarios fetch failed (%s): %s", market, exc)
+        return []
+
+
+def _find_scenario(scenario_id: str, db_rows: list[dict]) -> dict | None:
+    for s in db_rows:
+        if s["id"] == scenario_id:
+            return s
+    for scenarios in _FALLBACK_SCENARIOS.values():
+        for s in scenarios:
+            if s["id"] == scenario_id:
+                return s
+    return None
+
+
+# ─── Request/response models ──────────────────────────────────────────────────
+
 class AnswerSubmission(BaseModel):
     selected_index: int
     user_level: int = 1
     market: str = "india"
 
 
-@router.get("/daily")
-def get_daily_scenario(market: str = "india"):
-    """Return a daily scenario for the given market, rotated by day of week."""
-    from datetime import date
+# ─── Routes ───────────────────────────────────────────────────────────────────
 
-    scenarios = _DAILY_SCENARIOS.get(market, _DAILY_SCENARIOS["india"])
+@router.get("/daily")
+async def get_daily_scenario(market: str = "india", track: str = "tradr") -> dict:
+    """Return today's scenario. Supports track=codr for coding challenges."""
+    if track == "codr":
+        day_index = date.today().toordinal() % len(_CODR_FALLBACK_SCENARIOS)
+        return {"track": "codr", "scenario": _CODR_FALLBACK_SCENARIOS[day_index]}
+
+    scenarios = await _get_db_scenarios(market)
+    if not scenarios:
+        scenarios = _FALLBACK_SCENARIOS.get(market, _FALLBACK_SCENARIOS["india"])
+        logger.info("Using fallback scenarios for market=%s", market)
+
     day_index = date.today().toordinal() % len(scenarios)
     return {"market": market, "scenario": scenarios[day_index]}
 
 
 @router.post("/{scenario_id}/answer")
-async def submit_scenario_answer(scenario_id: str, body: AnswerSubmission):
-    """Submit an answer to a scenario. Returns correctness + explanation."""
-    # Find the scenario across all markets
-    scenario = None
-    for scenarios in _DAILY_SCENARIOS.values():
-        for s in scenarios:
-            if s["id"] == scenario_id:
-                scenario = s
-                break
-        if scenario:
-            break
+async def submit_scenario_answer(scenario_id: str, body: AnswerSubmission) -> dict:
+    """Submit an answer. Returns correctness, explanation, and optional Claude coaching."""
+    # Check Codr fallback first
+    codr_match = next((s for s in _CODR_FALLBACK_SCENARIOS if s["id"] == scenario_id), None)
+    if codr_match:
+        correct = body.selected_index == codr_match["correct"]
+        explanation = codr_match["explanation_short"]
+        claude_explanation = None
+        if not correct:
+            try:
+                from services.claude_service import explain_code_wrong_answer
+                claude_explanation = await explain_code_wrong_answer(
+                    question=codr_match["question"],
+                    user_answer=codr_match["options"][body.selected_index],
+                    correct_answer=codr_match["options"][codr_match["correct"]],
+                    short_explanation=explanation,
+                    user_level=body.user_level,
+                )
+            except Exception:
+                claude_explanation = explanation
+        return {
+            "correct": correct,
+            "correct_index": codr_match["correct"],
+            "explanation_short": explanation,
+            "media_literacy_note": None,
+            "claude_explanation": claude_explanation,
+        }
+
+    all_db = await _get_db_scenarios(body.market)
+    scenario = _find_scenario(scenario_id, all_db)
 
     if not scenario:
         raise HTTPException(status_code=404, detail="Scenario not found")
 
     correct = body.selected_index == scenario["correct"]
     explanation = scenario["explanation_short"]
-    claude_explanation = None
+    claude_explanation: str | None = None
 
     if not correct:
         try:
@@ -367,7 +552,8 @@ async def submit_scenario_answer(scenario_id: str, body: AnswerSubmission):
                 user_level=body.user_level,
                 market=body.market,
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("Claude explanation failed: %s", exc)
             claude_explanation = explanation
 
     return {

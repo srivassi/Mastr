@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { getLesson } from '../../lib/lessonData';
+import { BACKEND } from '../../lib/backend';
 import ProgressBar from '../../components/lesson/ProgressBar';
 import MultipleChoice from '../../components/lesson/MultipleChoice';
 import AnswerFooter from '../../components/lesson/AnswerFooter';
@@ -13,12 +14,33 @@ import FormattedText from '../../components/lesson/FormattedText';
 import CodeBlock from '../../components/lesson/CodeBlock';
 import ArrayVisual from '../../components/lesson/ArrayVisual';
 import TreeVisual from '../../components/lesson/TreeVisual';
+import type { Question } from '../../types';
 
 type AnswerState = 'idle' | 'correct' | 'wrong';
 
 export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const lesson = getLesson(id ?? '');
+  const localLesson = getLesson(id ?? '');
+  const user = useUserStore((s) => s.user);
+  const track = user?.track ?? 'tradr';
+  const market = user?.market ?? 'india';
+
+  const [liveQuestions, setLiveQuestions] = useState<Question[] | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`${BACKEND}/lessons/${id}/questions?track=${track}&market=${market}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const qs: Question[] = data.questions ?? [];
+        if (qs.length > 0) setLiveQuestions(qs);
+      })
+      .catch(() => {/* keep local */});
+  }, [id]);
+
+  const lesson = localLesson
+    ? { ...localLesson, questions: liveQuestions ?? localLesson.questions }
+    : null;
 
   const [index, setIndex]           = useState(0);
   const [selected, setSelected]     = useState<number | null>(null);

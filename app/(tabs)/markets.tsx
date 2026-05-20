@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  FlatList,
   Modal,
   Pressable,
   RefreshControl,
@@ -16,9 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, spacing, typography } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
+import { BACKEND } from '../../lib/backend';
 import type { Headline, MarketQuote } from '../../types';
-
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
 
 type MarketId = 'india' | 'eu' | 'us';
 
@@ -79,9 +77,11 @@ function SectorTile({ name, changePct }: { name: string; changePct: number }) {
 function HeadlineCard({
   headline,
   onExplain,
+  explainLabel = '🤖 Explain',
 }: {
   headline: Headline & { body_snippet?: string };
   onExplain: (h: Headline & { body_snippet?: string }) => void;
+  explainLabel?: string;
 }) {
   const timeAgo = useCallback(() => {
     if (!headline.publishedAt) return '';
@@ -104,7 +104,7 @@ function HeadlineCard({
           onPress={() => onExplain(headline)}
           accessibilityLabel={`Explain headline: ${headline.title}`}
         >
-          <Text style={styles.explainBtnText}>🤖 Explain</Text>
+          <Text style={styles.explainBtnText}>{explainLabel}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -202,9 +202,161 @@ function ExplainModal({
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Tech News View (Codr track) ─────────────────────────────────────────────
 
-export default function MarketsScreen() {
+function TechNewsView() {
+  const user = useUserStore((s) => s.user);
+  const [headlines, setHeadlines] = useState<(Headline & { body_snippet?: string })[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [explainTarget, setExplainTarget] = useState<(Headline & { body_snippet?: string }) | null>(null);
+  const [showExplain, setShowExplain] = useState(false);
+
+  async function load(isRefresh = false) {
+    if (!isRefresh) setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND}/news/tech`);
+      const data = await res.json();
+      setHeadlines((data.headlines ?? []) as (Headline & { body_snippet?: string })[]);
+    } catch {
+      // show empty
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function handleExplain(h: Headline & { body_snippet?: string }) {
+    setExplainTarget(h);
+    setShowExplain(true);
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Tech News</Text>
+        <View style={styles.trackChip}>
+          <Text style={styles.trackChipText}>💻 Codr</Text>
+        </View>
+      </View>
+
+      {loading ? (
+        <View style={styles.loadingFull}>
+          <ActivityIndicator size="large" color={colors.navy} />
+          <Text style={styles.loadingText}>Fetching latest tech…</Text>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={colors.navy} />
+          }
+        >
+          <Text style={styles.sectionLabel}>TODAY IN TECH & AI</Text>
+          {headlines.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No headlines available right now.</Text>
+            </View>
+          ) : (
+            headlines.map((h, i) => (
+              <HeadlineCard
+                key={`${h.id ?? h.title}-${i}`}
+                headline={h}
+                onExplain={handleExplain}
+                explainLabel="🤖 TLDR"
+              />
+            ))
+          )}
+          <View style={{ height: spacing.xxl }} />
+        </ScrollView>
+      )}
+
+      <TechExplainModal
+        visible={showExplain}
+        headline={explainTarget}
+        userLevel={user?.level ?? 1}
+        onClose={() => setShowExplain(false)}
+      />
+    </SafeAreaView>
+  );
+}
+
+// ─── Tech Explain Modal ───────────────────────────────────────────────────────
+
+function TechExplainModal({
+  visible,
+  headline,
+  userLevel,
+  onClose,
+}: {
+  visible: boolean;
+  headline: (Headline & { body_snippet?: string }) | null;
+  userLevel: number;
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [explanation, setExplanation] = useState('');
+  const slideAnim = useRef(new Animated.Value(300)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setExplanation('');
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
+      fetchExplanation();
+    } else {
+      Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true }).start();
+    }
+  }, [visible]);
+
+  async function fetchExplanation() {
+    if (!headline) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND}/news/tech/explain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ headline: headline.title, body_snippet: headline.body_snippet ?? '', user_level: userLevel }),
+      });
+      const data = await res.json();
+      setExplanation(data.explanation ?? '');
+    } catch {
+      setExplanation('Could not load explanation. Make sure the backend is running.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable>
+          <Animated.View style={[styles.explainSheet, { transform: [{ translateY: slideAnim }] }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle} numberOfLines={3}>{headline?.title}</Text>
+            <View style={styles.sheetDivider} />
+            {loading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color={colors.navy} />
+                <Text style={styles.loadingText}>Pip is reading the web…</Text>
+              </View>
+            ) : (
+              <Text style={styles.explanationText}>{explanation}</Text>
+            )}
+            <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.navy }]} onPress={onClose} accessibilityLabel="Close explanation">
+              <Text style={styles.closeBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ─── Tradr Markets View ───────────────────────────────────────────────────────
+
+function TradrMarketsView() {
   const storeMarket = useUserStore((s) => s.user?.market) as MarketId | undefined;
   const [market, setMarket] = useState<MarketId>(storeMarket ?? 'india');
   const [indices, setIndices] = useState<MarketQuote[]>([]);
@@ -226,7 +378,6 @@ export default function MarketsScreen() {
         fetch(`${BACKEND}/news/${market}`).then((r) => r.json()),
       ]);
 
-      // Map snake_case from backend to camelCase expected by types
       setIndices(
         (indRes as any[]).map((q: any) => ({
           ticker:    q.ticker,
@@ -239,7 +390,7 @@ export default function MarketsScreen() {
       );
       setSectors(secRes as any[]);
       setHeadlines((newsRes.headlines ?? []) as any[]);
-    } catch (err) {
+    } catch {
       // Non-critical — show empty state
     } finally {
       setLoading(false);
@@ -256,10 +407,8 @@ export default function MarketsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Markets</Text>
-        {/* Market selector tabs */}
         <View style={styles.marketTabs}>
           {(Object.keys(MARKET_META) as MarketId[]).map((m) => (
             <TouchableOpacity
@@ -290,17 +439,13 @@ export default function MarketsScreen() {
             />
           }
         >
-          {/* Market label */}
           <Text style={styles.sectionLabel}>
             {meta.flag} {meta.label.toUpperCase()}
           </Text>
 
-          {/* Index cards */}
           {indices.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
-                Market data unavailable · Backend offline?
-              </Text>
+              <Text style={styles.emptyText}>Market data unavailable · Backend offline?</Text>
             </View>
           ) : (
             indices.map((q) => (
@@ -308,12 +453,9 @@ export default function MarketsScreen() {
             ))
           )}
 
-          {/* Sector heatmap */}
           {sectors.length > 0 && (
             <>
-              <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>
-                SECTORS TODAY
-              </Text>
+              <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>SECTORS TODAY</Text>
               <View style={styles.heatmapGrid}>
                 {sectors.map((s) => (
                   <SectorTile key={s.sector} name={s.sector} changePct={s.change_pct} />
@@ -322,18 +464,15 @@ export default function MarketsScreen() {
             </>
           )}
 
-          {/* Headlines */}
-          <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>
-            TODAY'S HEADLINES
-          </Text>
+          <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>TODAY'S HEADLINES</Text>
           {headlines.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyText}>No headlines available right now.</Text>
             </View>
           ) : (
-            headlines.map((h) => (
+            headlines.map((h, i) => (
               <HeadlineCard
-                key={h.id}
+                key={`${h.id ?? h.title}-${i}`}
                 headline={h}
                 onExplain={handleExplain}
               />
@@ -352,6 +491,13 @@ export default function MarketsScreen() {
       />
     </SafeAreaView>
   );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function MarketsScreen() {
+  const track = useUserStore((s) => s.user?.track ?? 'tradr');
+  return track === 'codr' ? <TechNewsView /> : <TradrMarketsView />;
 }
 
 const styles = StyleSheet.create({
@@ -516,6 +662,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   closeBtnText: { fontSize: typography.base, fontWeight: '800', color: '#fff' },
+
+  // Codr track chip
+  trackChip: {
+    backgroundColor: '#EEF6FF',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1.5,
+    borderColor: colors.navy,
+  },
+  trackChipText: { fontSize: typography.xs, fontWeight: '800', color: colors.navy },
 
   // Loading / empty states
   loadingFull: {

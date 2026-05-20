@@ -12,8 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, spacing, typography } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
-
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+import { BACKEND } from '../../lib/backend';
 
 type AnswerState = 'idle' | 'selected' | 'correct' | 'wrong';
 
@@ -65,9 +64,9 @@ function OptionButton({
   const isSelected = selectedIndex === index;
   const isCorrect = index === correctIndex;
 
-  let bgColor = '#fff';
-  let borderColor = colors.border;
-  let textColor = colors.textPrimary;
+  let bgColor: string = '#fff';
+  let borderColor: string = colors.border;
+  let textColor: string = colors.textPrimary;
 
   if (answerState === 'selected' && isSelected) {
     bgColor = '#DDF4FF';
@@ -100,11 +99,218 @@ function OptionButton({
   );
 }
 
+// ─── Codr Practice ───────────────────────────────────────────────────────────
+
+interface CodrScenario {
+  id: string;
+  track: string;
+  pattern: string;
+  context: string;
+  question: string;
+  options: string[];
+  correct: number;
+  explanation_short: string;
+  difficulty: number;
+  tags: string[];
+}
+
+function CodrPracticeScreen() {
+  const user = useUserStore((s) => s.user);
+  const addXP = useUserStore((s) => s.addXP);
+
+  const [scenario, setScenario] = useState<CodrScenario | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [answerState, setAnswerState] = useState<AnswerState>('idle');
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<{
+    correct: boolean;
+    explanation_short: string;
+    claude_explanation: string | null;
+  } | null>(null);
+  const [xpEarned, setXpEarned] = useState(0);
+
+  const footerAnim = useRef(new Animated.Value(120)).current;
+  const xpAnim = useRef(new Animated.Value(0)).current;
+
+  async function loadChallenge() {
+    setLoading(true);
+    setSelectedIndex(null);
+    setAnswerState('idle');
+    setResult(null);
+    setXpEarned(0);
+    try {
+      const res = await fetch(`${BACKEND}/scenarios/daily?track=codr`);
+      if (!res.ok) throw new Error('fetch failed');
+      const data = await res.json();
+      setScenario(data.scenario ?? null);
+    } catch {
+      setScenario(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadChallenge(); }, []);
+
+  function selectOption(index: number) {
+    if (answerState !== 'idle') return;
+    setSelectedIndex(index);
+    setAnswerState('selected');
+  }
+
+  async function checkAnswer() {
+    if (selectedIndex === null || !scenario || checking) return;
+    setChecking(true);
+    try {
+      const res = await fetch(`${BACKEND}/scenarios/${scenario.id}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selected_index: selectedIndex, user_level: user?.level ?? 1, market: 'us' }),
+      });
+      const data = await res.json();
+      const isCorrect: boolean = data.correct;
+      setResult({
+        correct: isCorrect,
+        explanation_short: data.explanation_short,
+        claude_explanation: data.claude_explanation ?? null,
+      });
+      setAnswerState(isCorrect ? 'correct' : 'wrong');
+      Animated.spring(footerAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
+      if (isCorrect) {
+        const xp = 30;
+        setXpEarned(xp);
+        addXP(xp);
+        Animated.sequence([
+          Animated.timing(xpAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.delay(1200),
+          Animated.timing(xpAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+        ]).start();
+      }
+    } catch {
+      setAnswerState('idle');
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingFull}>
+          <ActivityIndicator size="large" color={colors.navy} />
+          <Text style={styles.loadingText}>Loading today's challenge…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!scenario) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <Text style={styles.title}>Practice</Text>
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyEmoji}>💻</Text>
+            <Text style={styles.emptyTitle}>No challenge today</Text>
+            <Text style={styles.emptySubtext}>Make sure the backend is running.</Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  const isAnswered = answerState === 'correct' || answerState === 'wrong';
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.xpBurst, { opacity: xpAnim, transform: [{ translateY: xpAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -40] }) }] }]}
+      >
+        <Text style={styles.xpBurstText}>+{xpEarned} XP ⚡</Text>
+      </Animated.View>
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Practice</Text>
+          <View style={[styles.dailyChip, { borderColor: colors.navy, backgroundColor: '#EEF6FF' }]}>
+            <Text style={[styles.dailyChipText, { color: colors.navy }]}>💻 Daily Challenge</Text>
+          </View>
+        </View>
+
+        <View style={[styles.scenarioCard, { borderColor: colors.navy, backgroundColor: '#F0F8FF' }]}>
+          <View style={styles.scenarioMeta}>
+            <Text style={[styles.liveTag, { color: colors.navy }]}>📐 {scenario.pattern?.toUpperCase() ?? 'ALGORITHM'}</Text>
+            <DifficultyPips level={scenario.difficulty} />
+          </View>
+          <Text style={styles.contextText}>{scenario.context}</Text>
+        </View>
+
+        <Text style={styles.question}>{scenario.question}</Text>
+
+        <View style={styles.optionsContainer}>
+          {scenario.options.map((opt, i) => (
+            <OptionButton
+              key={i}
+              text={opt}
+              index={i}
+              selectedIndex={selectedIndex}
+              correctIndex={scenario.correct}
+              answerState={answerState}
+              onPress={selectOption}
+            />
+          ))}
+        </View>
+
+        <View style={{ height: isAnswered ? 220 : 100 }} />
+      </ScrollView>
+
+      {!isAnswered && (
+        <View style={styles.checkContainer}>
+          <TouchableOpacity
+            style={[styles.checkBtn, selectedIndex === null && styles.checkBtnDisabled, { backgroundColor: selectedIndex !== null ? colors.navy : colors.disabled }]}
+            onPress={checkAnswer}
+            disabled={selectedIndex === null || checking}
+            accessibilityLabel="Check answer"
+          >
+            {checking ? <ActivityIndicator color="#fff" /> : <Text style={styles.checkBtnText}>CHECK</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isAnswered && result && (
+        <Animated.View
+          style={[styles.resultFooter, result.correct ? styles.footerCorrect : styles.footerWrong, { transform: [{ translateY: footerAnim }] }]}
+        >
+          <Text style={[styles.footerLabel, result.correct ? styles.footerLabelCorrect : styles.footerLabelWrong]}>
+            {result.correct ? '✅  Great job!' : '❌  Not quite'}
+          </Text>
+          <Text style={styles.footerExplanation}>
+            {result.claude_explanation ?? result.explanation_short}
+          </Text>
+          <TouchableOpacity
+            style={[styles.continueBtn, result.correct ? styles.continueBtnCorrect : styles.continueBtnWrong]}
+            onPress={loadChallenge}
+            accessibilityLabel="Next challenge"
+          >
+            <Text style={styles.continueBtnText}>NEXT CHALLENGE</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+    </SafeAreaView>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function PracticeScreen() {
   const user = useUserStore((s) => s.user);
   const addXP = useUserStore((s) => s.addXP);
+  const track = user?.track ?? 'tradr';
+
+  if (track === 'codr') return <CodrPracticeScreen />;
+
   const market = (user?.market ?? 'india') as string;
 
   const [scenario, setScenario] = useState<Scenario | null>(null);
@@ -285,16 +491,8 @@ export default function PracticeScreen() {
           ))}
         </View>
 
-        {/* Media literacy note (shows after correct answer) */}
-        {isAnswered && result?.media_literacy_note && showMediaNote && (
-          <View style={styles.mediaNote}>
-            <Text style={styles.mediaNoteTitle}>🧐 Media Literacy Note</Text>
-            <Text style={styles.mediaNoteText}>{result.media_literacy_note}</Text>
-          </View>
-        )}
-
         {/* Bottom padding for footer */}
-        <View style={{ height: isAnswered ? 220 : 100 }} />
+        <View style={{ height: isAnswered ? (showMediaNote ? 400 : 220) : 100 }} />
       </ScrollView>
 
       {/* CHECK button (before answer) */}
@@ -341,6 +539,12 @@ export default function PracticeScreen() {
             >
               <Text style={styles.mediaBtnText}>🧐 Show Media Literacy Note</Text>
             </TouchableOpacity>
+          )}
+          {result.media_literacy_note && showMediaNote && (
+            <View style={styles.mediaNote}>
+              <Text style={styles.mediaNoteTitle}>🧐 Media Literacy Note</Text>
+              <Text style={styles.mediaNoteText}>{result.media_literacy_note}</Text>
+            </View>
           )}
           <TouchableOpacity
             style={[styles.continueBtn, result.correct ? styles.continueBtnCorrect : styles.continueBtnWrong]}

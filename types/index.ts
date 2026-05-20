@@ -35,6 +35,37 @@ export interface LessonProgress {
   completedAt: string | null;
 }
 
+// ─── Array visual types ───────────────────────────────────────────────────────
+
+export type ArrayHighlight = 'primary' | 'secondary' | 'window' | 'match' | 'inactive';
+
+export interface ArrayElement {
+  value: string | number;
+  highlight?: ArrayHighlight;
+  pointer?: string;
+}
+
+export interface QuestionArrayData {
+  elements: ArrayElement[];
+  title?: string;
+}
+
+// ─── Tree visual types ────────────────────────────────────────────────────────
+
+export type TreeHighlight = 'primary' | 'secondary' | 'visited';
+
+export interface TreeNodeData {
+  value: string | number;
+  highlight?: TreeHighlight;
+  left?: TreeNodeData;
+  right?: TreeNodeData;
+}
+
+export interface QuestionTreeData {
+  root: TreeNodeData;
+  title?: string;
+}
+
 // ─── Chart types ──────────────────────────────────────────────────────────────
 
 export interface CandlePoint {
@@ -85,6 +116,8 @@ export interface Question {
   explanationShort: string;
   tags: string[];
   chartData?: QuestionChartData;
+  arrayData?: QuestionArrayData;
+  treeData?: QuestionTreeData;
 }
 
 export interface Scenario extends Question {

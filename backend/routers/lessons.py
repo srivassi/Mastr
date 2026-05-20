@@ -1,3 +1,4 @@
+import json
 import math
 import logging
 from datetime import date, timedelta
@@ -53,6 +54,34 @@ def get_lessons(market: str = "india"):
 @router.get("/{lesson_id}", summary="Get lesson content (stub)", include_in_schema=False)
 def get_lesson(lesson_id: str):
     return {"lesson_id": lesson_id, "questions": []}
+
+
+@router.get(
+    "/{lesson_id}/questions",
+    summary="Get live-generated question variants for a lesson",
+    description="Returns Claude-generated MCQ variants from Supabase. Returns [] if none exist yet — the client falls back to local lesson data.",
+)
+async def get_live_questions(lesson_id: str, track: str = "tradr", market: str = "india") -> dict:
+    """Return generated question variants from Supabase for this lesson/track."""
+    db = get_client()
+    try:
+        result = (
+            db.table("questions")
+            .select("id,type,question,options,correct,explanation_short,tags,difficulty")
+            .eq("track", track)
+            .eq("active", True)
+            .order("generated_at", desc=True)
+            .limit(15)
+            .execute()
+        )
+        rows: list[dict] = result.data or []
+        for row in rows:
+            if isinstance(row.get("options"), str):
+                row["options"] = json.loads(row["options"])
+        return {"questions": rows}
+    except Exception as exc:
+        logger.warning("Live questions fetch failed for %s: %s", lesson_id, exc)
+        return {"questions": []}
 
 
 @router.post(
