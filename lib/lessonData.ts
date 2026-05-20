@@ -1,4 +1,12 @@
 import type { Lesson } from '../types';
+import CODR_LESSONS from './codrLessonData';
+import CODR_LESSONS_2 from './codrLessonData2';
+import CODR_LESSONS_3 from './codrLessonData3';
+import CODR_LESSONS_4 from './codrLessonData4';
+
+const CODR_MAP: Record<string, Lesson> = Object.fromEntries(
+  [...CODR_LESSONS, ...CODR_LESSONS_2, ...CODR_LESSONS_3, ...CODR_LESSONS_4].map((l) => [l.id, l]),
+);
 
 const LESSONS: Record<string, Lesson> = {
 
@@ -1247,5 +1255,5 @@ const LESSONS: Record<string, Lesson> = {
 };
 
 export function getLesson(id: string): Lesson | null {
-  return LESSONS[id] ?? null;
+  return LESSONS[id] ?? CODR_MAP[id] ?? null;
 }

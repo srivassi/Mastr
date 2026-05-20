@@ -78,6 +78,8 @@ export interface Question {
   id: string;
   type: 'multiple_choice' | 'chart_question' | 'tap_the_word' | 'fill_in_blank' | 'scenario';
   question: string;
+  codeSnippet?: string;
+  codeLanguage?: string;
   options: string[];
   correct: number;
   explanationShort: string;

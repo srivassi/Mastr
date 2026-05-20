@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '../../constants/theme';
@@ -9,6 +9,10 @@ import ProgressBar from '../../components/lesson/ProgressBar';
 import MultipleChoice from '../../components/lesson/MultipleChoice';
 import AnswerFooter from '../../components/lesson/AnswerFooter';
 import ChartQuestion from '../../components/lesson/ChartQuestion';
+import FormattedText from '../../components/lesson/FormattedText';
+import CodeBlock from '../../components/lesson/CodeBlock';
+import ArrayVisual from '../../components/lesson/ArrayVisual';
+import TreeVisual from '../../components/lesson/TreeVisual';
 
 type AnswerState = 'idle' | 'correct' | 'wrong';
 
@@ -99,6 +103,7 @@ export default function LessonScreen() {
         total={lesson.questions.length}
         hearts={hearts}
         onExit={handleExit}
+        lessonName={lesson.name}
       />
 
       <ScrollView
@@ -107,8 +112,13 @@ export default function LessonScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {question.chartData && <ChartQuestion chartData={question.chartData} />}
-        <Text style={styles.question}>{question.question}</Text>
+        {question.chartData  && <ChartQuestion chartData={question.chartData} />}
+        {question.arrayData  && <ArrayVisual  arrayData={question.arrayData} />}
+        {question.treeData   && <TreeVisual   treeData={question.treeData} />}
+        {question.codeSnippet && (
+          <CodeBlock code={question.codeSnippet} language={question.codeLanguage} />
+        )}
+        <FormattedText text={question.question} style={styles.question} />
       </ScrollView>
 
       <MultipleChoice
