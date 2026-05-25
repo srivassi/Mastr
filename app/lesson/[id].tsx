@@ -49,7 +49,6 @@ export default function LessonScreen() {
   const [hearts, setHearts]         = useState(5);
   const [correctCount, setCorrectCount] = useState(0);
 
-  const addXP    = useUserStore((s) => s.addXP);
   const useHeart = useUserStore((s) => s.useHeart);
 
   if (!lesson) {
@@ -79,7 +78,6 @@ export default function LessonScreen() {
     const correct = selected === question.correct;
     setAnswerState(correct ? 'correct' : 'wrong');
     if (correct) {
-      addXP(10);
       setCorrectCount((c) => c + 1);
     } else {
       if (hearts > 0) {
@@ -98,9 +96,9 @@ export default function LessonScreen() {
     }
 
     if (isLast) {
-      const xp      = correctCount * 10 + lesson.xpReward;
-      const perfect = correctCount === lesson.questions.length;
-      if (perfect) addXP(50);
+      const perfect     = correctCount === lesson.questions.length;
+      const perfectBonus = perfect ? 50 : 0;
+      const xp          = correctCount * 10 + lesson.xpReward + perfectBonus;
       router.replace({
         pathname: '/lesson/complete',
         params: {

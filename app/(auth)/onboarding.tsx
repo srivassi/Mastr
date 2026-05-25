@@ -19,7 +19,7 @@ const TRACKS: { id: TrackId; icon: string; label: string; sub: string }[] = [
 ];
 
 export default function OnboardingScreen() {
-  const [step, setStep]               = useState<0 | 1>(0);
+  const [step, setStep]                         = useState<0 | 1>(0);
   const [selectedTrack, setSelectedTrack]       = useState<TrackId | null>(null);
   const [selectedMarket, setSelectedMarket]     = useState<MarketId | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageId | null>(null);
@@ -34,10 +34,9 @@ export default function OnboardingScreen() {
     setStep(1);
   }
 
-  function handleFinalContinue() {
+  function handleMarketLanguageContinue() {
     if (selectedTrack === 'tradr' && !selectedMarket) return;
     if (selectedTrack === 'codr'  && !selectedLanguage) return;
-
     if (selectedMarket)   setMarket(selectedMarket);
     if (selectedLanguage) setLanguage(selectedLanguage);
     router.push('/(auth)/signup');
@@ -94,8 +93,7 @@ export default function OnboardingScreen() {
     );
   }
 
-  // Step 1 — market picker (Tradr) or language picker (Codr)
-  if (selectedTrack === 'tradr') {
+  if (step === 1 && selectedTrack === 'tradr') {
     return (
       <SafeAreaView style={styles.safe}>
         <ScrollView
@@ -139,10 +137,10 @@ export default function OnboardingScreen() {
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.btnGreen, !selectedMarket && styles.btnDisabled]}
-            onPress={handleFinalContinue}
+            onPress={handleMarketLanguageContinue}
             disabled={!selectedMarket}
             activeOpacity={0.8}
-            accessibilityLabel="Continue to sign up"
+            accessibilityLabel="Continue to create account"
           >
             <Text style={styles.btnText}>Continue</Text>
           </TouchableOpacity>
@@ -151,60 +149,63 @@ export default function OnboardingScreen() {
     );
   }
 
-  // Codr — language selection
-  return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity style={styles.backBtn} onPress={() => setStep(0)} activeOpacity={0.7}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Pick your language</Text>
-        <Text style={styles.subtitle}>
-          Questions and patterns will use your language's syntax. You can switch later.
-        </Text>
-
-        {(Object.keys(LANGUAGES) as LanguageId[]).map((id) => {
-          const lang = LANGUAGES[id];
-          const isSelected = selectedLanguage === id;
-          return (
-            <TouchableOpacity
-              key={id}
-              style={[styles.card, isSelected && styles.cardSelected]}
-              onPress={() => setSelectedLanguage(id)}
-              activeOpacity={0.8}
-              accessibilityLabel={`Select ${lang.label}`}
-            >
-              <Text style={styles.flag}>{lang.icon}</Text>
-              <View style={styles.cardText}>
-                <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>
-                  {lang.label}
-                </Text>
-                <Text style={styles.cardSub}>{lang.description}</Text>
-              </View>
-              {isSelected && <Text style={styles.tick}>✓</Text>}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.btnGreen, !selectedLanguage && styles.btnDisabled]}
-          onPress={handleFinalContinue}
-          disabled={!selectedLanguage}
-          activeOpacity={0.8}
-          accessibilityLabel="Continue to sign up"
+  if (step === 1 && selectedTrack === 'codr') {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.btnText}>Continue</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
-  );
+          <TouchableOpacity style={styles.backBtn} onPress={() => setStep(0)} activeOpacity={0.7}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.title}>Pick your language</Text>
+          <Text style={styles.subtitle}>
+            Questions and patterns will use your language's syntax. You can switch later.
+          </Text>
+
+          {(Object.keys(LANGUAGES) as LanguageId[]).map((id) => {
+            const lang = LANGUAGES[id];
+            const isSelected = selectedLanguage === id;
+            return (
+              <TouchableOpacity
+                key={id}
+                style={[styles.card, isSelected && styles.cardSelected]}
+                onPress={() => setSelectedLanguage(id)}
+                activeOpacity={0.8}
+                accessibilityLabel={`Select ${lang.label}`}
+              >
+                <Text style={styles.flag}>{lang.icon}</Text>
+                <View style={styles.cardText}>
+                  <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>
+                    {lang.label}
+                  </Text>
+                  <Text style={styles.cardSub}>{lang.description}</Text>
+                </View>
+                {isSelected && <Text style={styles.tick}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.btnGreen, !selectedLanguage && styles.btnDisabled]}
+            onPress={handleMarketLanguageContinue}
+            disabled={!selectedLanguage}
+            activeOpacity={0.8}
+            accessibilityLabel="Continue to create account"
+          >
+            <Text style={styles.btnText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return null;
 }
 
 const styles = StyleSheet.create({

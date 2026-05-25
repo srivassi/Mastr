@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function ProgressBar({ current, total, hearts, onExit, lessonName }: Props) {
-  const progress = Math.min((current - 1) / total, 1);
+  const progress = Math.min(current / total, 1);
 
   return (
     <View style={styles.container}>
