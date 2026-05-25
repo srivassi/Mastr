@@ -86,6 +86,8 @@ export default function LoginScreen() {
           heartsRefillAt: p.hearts_refill_at,
           league:         p.league as League,
         } satisfies User);
+        router.replace('/(auth)/placement');
+        return;
       } else {
         p = rawProfile as UserRow;
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '../../constants/theme';
 
 type AnswerState = 'idle' | 'correct' | 'wrong';
@@ -14,6 +15,7 @@ interface Props {
 
 export default function AnswerFooter({ answerState, explanation, disabled, onCheck, onContinue }: Props) {
   const slideAnim = useRef(new Animated.Value(200)).current;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (answerState !== 'idle') {
@@ -28,9 +30,16 @@ export default function AnswerFooter({ answerState, explanation, disabled, onChe
     }
   }, [answerState]);
 
-  if (answerState === 'idle') {
-    return (
-      <View style={styles.idleFooter}>
+  const isCorrect  = answerState === 'correct';
+  const showResult = answerState !== 'idle';
+
+  return (
+    <>
+      {/* Always in layout flow — holds space so question/pip never shift */}
+      <View
+        pointerEvents={showResult ? 'none' : 'auto'}
+        style={[styles.idleFooter, showResult && styles.idleFooterHidden]}
+      >
         <TouchableOpacity
           style={[styles.checkBtn, disabled && styles.checkBtnDisabled]}
           onPress={onCheck}
@@ -43,39 +52,38 @@ export default function AnswerFooter({ answerState, explanation, disabled, onChe
           </Text>
         </TouchableOpacity>
       </View>
-    );
-  }
 
-  const isCorrect = answerState === 'correct';
+      {/* Absolute overlay — slides up over options, never pushes content */}
+      {showResult && (
+        <Animated.View
+          style={[
+            styles.resultPanel,
+            isCorrect ? styles.resultPanelCorrect : styles.resultPanelWrong,
+            { transform: [{ translateY: slideAnim }], paddingBottom: Math.max(spacing.xl, insets.bottom + spacing.md) },
+          ]}
+        >
+          <View style={styles.resultHeader}>
+            <Text style={[styles.resultIcon, isCorrect ? styles.textCorrect : styles.textWrong]}>
+              {isCorrect ? '✓' : '✗'}
+            </Text>
+            <Text style={[styles.resultTitle, isCorrect ? styles.textCorrect : styles.textWrong]}>
+              {isCorrect ? 'Great job!' : 'Not quite'}
+            </Text>
+          </View>
 
-  return (
-    <Animated.View
-      style={[
-        styles.resultPanel,
-        isCorrect ? styles.resultPanelCorrect : styles.resultPanelWrong,
-        { transform: [{ translateY: slideAnim }] },
-      ]}
-    >
-      <View style={styles.resultHeader}>
-        <Text style={[styles.resultIcon, isCorrect ? styles.textCorrect : styles.textWrong]}>
-          {isCorrect ? '✓' : '✗'}
-        </Text>
-        <Text style={[styles.resultTitle, isCorrect ? styles.textCorrect : styles.textWrong]}>
-          {isCorrect ? 'Great job!' : 'Not quite'}
-        </Text>
-      </View>
+          <Text style={styles.explanation}>{explanation}</Text>
 
-      <Text style={styles.explanation}>{explanation}</Text>
-
-      <TouchableOpacity
-        style={[styles.continueBtn, isCorrect ? styles.continueBtnCorrect : styles.continueBtnWrong]}
-        onPress={onContinue}
-        activeOpacity={0.8}
-        accessibilityLabel="Continue"
-      >
-        <Text style={styles.continueBtnText}>CONTINUE</Text>
-      </TouchableOpacity>
-    </Animated.View>
+          <TouchableOpacity
+            style={[styles.continueBtn, isCorrect ? styles.continueBtnCorrect : styles.continueBtnWrong]}
+            onPress={onContinue}
+            activeOpacity={0.8}
+            accessibilityLabel="Continue"
+          >
+            <Text style={styles.continueBtnText}>CONTINUE</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+    </>
   );
 }
 
@@ -86,6 +94,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.background,
+  },
+  idleFooterHidden: {
+    opacity: 0,
   },
   checkBtn: {
     backgroundColor: colors.primary,
@@ -113,9 +124,17 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   resultPanel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: spacing.lg,
-    paddingBottom: spacing.xl,
     gap: spacing.md,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
   resultPanelCorrect: { backgroundColor: '#D7FFB8' },
   resultPanelWrong:   { backgroundColor: '#FFDFE0' },
