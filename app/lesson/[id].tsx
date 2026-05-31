@@ -6,6 +6,7 @@ import { colors, spacing, typography } from '../../constants/theme';
 import { useUserStore } from '../../store/userStore';
 import { getLesson } from '../../lib/lessonData';
 import { BACKEND } from '../../lib/backend';
+import { getWrongAnswerExplanation } from '../../lib/api';
 import ProgressBar from '../../components/lesson/ProgressBar';
 import Pip from '../../components/pip/Pip';
 import MultipleChoice from '../../components/lesson/MultipleChoice';
@@ -48,6 +49,7 @@ export default function LessonScreen() {
   const [answerState, setAnswerState] = useState<AnswerState>('idle');
   const [hearts, setHearts]         = useState(5);
   const [correctCount, setCorrectCount] = useState(0);
+  const [claudeExplanation, setClaudeExplanation] = useState<string | null>(null);
 
   const useHeart = useUserStore((s) => s.useHeart);
 
@@ -77,6 +79,7 @@ export default function LessonScreen() {
     if (selected === null) return;
     const correct = selected === question.correct;
     setAnswerState(correct ? 'correct' : 'wrong');
+    setClaudeExplanation(null);
     if (correct) {
       setCorrectCount((c) => c + 1);
     } else {
@@ -84,6 +87,13 @@ export default function LessonScreen() {
         setHearts((h) => h - 1);
         useHeart();
       }
+      void getWrongAnswerExplanation(id ?? '', {
+        question:          question.question,
+        user_answer:       question.options[selected],
+        correct_answer:    question.options[question.correct],
+        short_explanation: question.explanationShort,
+        track,
+      }).then((exp) => setClaudeExplanation(exp)).catch(() => { /* keep short explanation */ });
     }
   }
 
@@ -115,6 +125,7 @@ export default function LessonScreen() {
     setIndex((i) => i + 1);
     setSelected(null);
     setAnswerState('idle');
+    setClaudeExplanation(null);
   }
 
   return (
@@ -161,7 +172,7 @@ export default function LessonScreen() {
 
       <AnswerFooter
         answerState={answerState}
-        explanation={question.explanationShort}
+        explanation={claudeExplanation ?? question.explanationShort}
         disabled={selected === null}
         onCheck={handleCheck}
         onContinue={handleContinue}
