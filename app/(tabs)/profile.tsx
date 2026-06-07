@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,13 +20,20 @@ const BADGES = [
   { id: 'golden_bull',     icon: '🐂', name: 'Golden Bull',    condition: 'Reach level 41' },
 ];
 
-function earnedBadges(completedLessons: string[], streakDays: number): Set<string> {
+function earnedBadges(
+  completedLessons: string[],
+  streakDays: number,
+  level: number,
+  perfectCount: number,
+): Set<string> {
   const earned = new Set<string>();
-  if (completedLessons.includes('unit1-lesson1')) earned.add('first_steps');
-  if (completedLessons.some((l) => l.startsWith('unit2'))) earned.add('chart_reader');
-  if (completedLessons.some((l) => l.startsWith('unit3'))) earned.add('macro_mind');
-  if (streakDays >= 7)  earned.add('week_warrior');
-  if (streakDays >= 30) earned.add('diamond_hands');
+  if (completedLessons.length > 0)                          earned.add('first_steps');
+  if (completedLessons.some((l) => l.includes('unit2') || l.includes('codr2'))) earned.add('chart_reader');
+  if (completedLessons.some((l) => l.includes('unit3') || l.includes('codr3'))) earned.add('macro_mind');
+  if (streakDays >= 7)   earned.add('week_warrior');
+  if (streakDays >= 30)  earned.add('diamond_hands');
+  if (level >= 41)       earned.add('golden_bull');
+  if (perfectCount >= 5) earned.add('perfect_run');
   return earned;
 }
 
@@ -85,9 +93,11 @@ function BadgeItem({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const user            = useUserStore((s) => s.user);
-  const clearUser       = useUserStore((s) => s.clearUser);
-  const completedLessons = useUserStore((s) => s.completedLessons);
+  const user                = useUserStore((s) => s.user);
+  const clearUser           = useUserStore((s) => s.clearUser);
+  const completedLessons    = useUserStore((s) => s.completedLessons);
+  const perfectLessonsCount = useUserStore((s) => s.perfectLessonsCount);
+  const checkAndRefillHearts = useUserStore((s) => s.checkAndRefillHearts);
 
   async function handleSignOut() {
     Alert.alert('Sign out', 'Are you sure?', [
@@ -103,10 +113,13 @@ export default function ProfileScreen() {
     ]);
   }
 
+  // Check heart refill every time the profile tab is focused
+  useEffect(() => { checkAndRefillHearts(); }, []);
+
   if (!user) return null;
 
   const stage = PIP_STAGES[user.pipStage];
-  const earned = earnedBadges(completedLessons, user.streakDays);
+  const earned = earnedBadges(completedLessons, user.streakDays, user.level, perfectLessonsCount);
   const trackLabel = user.track === 'codr' ? `💻 Codr · ${user.language}` : `📈 Tradr · ${user.market}`;
   const leagueColor: Record<string, string> = {
     Bronze: '#CD7F32', Silver: '#C0C0C0', Gold: '#FFD700',
@@ -142,7 +155,13 @@ export default function ProfileScreen() {
         <View style={styles.statsRow}>
           <StatCard icon="🔥" value={user.streakDays} label="Day Streak" />
           <StatCard icon="⚡" value={user.xp.toLocaleString()} label="Total XP" />
-          <StatCard icon="❤️" value={user.hearts} label="Hearts" />
+          <StatCard
+            icon="❤️"
+            value={user.hearts === 0 && user.heartsRefillAt
+              ? `Refills in ${Math.ceil((new Date(user.heartsRefillAt).getTime() - Date.now()) / 3600000)}h`
+              : user.hearts}
+            label="Hearts"
+          />
           <StatCard icon="📚" value={completedLessons.length} label="Lessons" />
         </View>
 

@@ -186,6 +186,112 @@ _FALLBACK_SCENARIOS: dict[str, list[dict]] = {
             "difficulty": 2,
             "tags": ["fii", "dii", "flows"],
         },
+        {
+            "id": "india-rbi-rate-cut",
+            "market": "india",
+            "context": (
+                "The RBI cut the repo rate by 25bps to 6.25% — its first cut in nearly 5 years — "
+                "citing easing inflation and slowing growth. The Nifty 50 jumped 1.4% on the day. "
+                "The rupee weakened slightly to ₹86.8 per dollar."
+            ),
+            "question": "Why did the Nifty rally while the rupee weakened on the same rate-cut announcement?",
+            "options": [
+                "Lower rates make equities relatively more attractive, but reduce returns on rupee assets for foreign investors",
+                "Equities and currencies always move in opposite directions",
+                "The RBI cut was too small to affect equities but large enough to crash the rupee",
+                "Markets rallied because the RBI will now buy more stocks",
+            ],
+            "correct": 0,
+            "explanation_short": (
+                "Rate cuts reduce the cost of borrowing and boost earnings expectations — good for stocks. "
+                "But lower rates also reduce returns on rupee deposits, prompting some foreign capital to leave — weakening the rupee. "
+                "Both moves reflect the same cut, via different channels."
+            ),
+            "difficulty": 3,
+            "tags": ["rbi", "rate-cut", "rupee", "equities"],
+        },
+        {
+            "id": "india-budget-ltcg",
+            "market": "india",
+            "context": (
+                "The Union Budget raised the Long-Term Capital Gains (LTCG) tax on equity from 10% to 12.5% "
+                "and Short-Term Capital Gains (STCG) from 15% to 20%. "
+                "The Nifty fell 1.5% on Budget day before recovering."
+            ),
+            "question": "Why did markets react negatively to the LTCG/STCG tax hike even though the absolute rates remain relatively low?",
+            "options": [
+                "Any tax increase on equities discourages investment at the margin — higher taxes reduce after-tax returns",
+                "The 12.5% LTCG rate is the highest in the world, making Indian markets uncompetitive",
+                "Markets fell because the government will now use the extra tax revenue to buy gold",
+                "LTCG and STCG changes only affect institutional investors, who always sell on policy changes",
+            ],
+            "correct": 0,
+            "explanation_short": (
+                "Equity investment returns must be measured after tax. A higher LTCG rate reduces net returns, "
+                "which at the margin shifts some capital toward alternatives (real estate, bonds, gold). "
+                "Markets fell on the announcement but often recover as investors reprice the new normal."
+            ),
+            "media_literacy_note": (
+                "Headlines shouted 'Budget SHOCK as LTCG hiked'. The rate went from 10% to 12.5% — "
+                "meaningful, but 'shock' is hyperbole. Framing matters: a 2.5pp change sounds small; "
+                "a 25% relative increase in the tax rate sounds dramatic. Same fact, different frames."
+            ),
+            "difficulty": 2,
+            "tags": ["budget", "taxation", "ltcg", "equities"],
+        },
+        {
+            "id": "india-election-rally",
+            "market": "india",
+            "context": (
+                "Exit polls predicted a landslide majority for the ruling party in the General Election. "
+                "The Nifty surged 3.5% the day after polling closed. "
+                "Actual results showed a much narrower majority than predicted, and the Nifty fell 4.1% on counting day."
+            ),
+            "question": "What does the sharp reversal from a +3.5% pre-result rally to a -4.1% fall on counting day tell us about market pricing?",
+            "options": [
+                "Markets are irrational and cannot be predicted",
+                "The pre-result rally priced in a strong majority — when results showed a weaker mandate, the market repriced the policy certainty premium",
+                "Exit polls are always correct and the actual votes must have been wrong",
+                "Foreign investors caused the fall by selling Indian stocks on the actual result",
+            ],
+            "correct": 1,
+            "explanation_short": (
+                "Markets had priced in the exit-poll scenario of a large majority — perceived as more policy-stable. "
+                "A narrower majority creates coalition dependencies and policy uncertainty. "
+                "The 4.1% fall is the market removing the 'strong mandate' premium it had added."
+            ),
+            "media_literacy_note": (
+                "The narrative flipped overnight from 'markets celebrate historic win' to 'markets rattled by weak mandate'. "
+                "The policy environment barely changed — the same party won. "
+                "The story was expectations vs reality, not fundamentals."
+            ),
+            "difficulty": 3,
+            "tags": ["elections", "market-expectations", "policy"],
+        },
+        {
+            "id": "india-us-tariff-it",
+            "market": "india",
+            "context": (
+                "The US announced sweeping tariffs on imports from multiple countries. "
+                "While IT services are technically exempt from goods tariffs, the Nifty IT index fell 3.2% "
+                "on fears of a US recession reducing tech spending."
+            ),
+            "question": "Why did Indian IT stocks fall on US tariff news when IT services are not directly tariffed?",
+            "options": [
+                "SEBI imposed restrictions on IT companies in response to US policy",
+                "US tariffs always cause Indian IT stocks to fall regardless of their direct impact",
+                "Tariffs raise costs and slow the US economy — Indian IT earns 60%+ revenue from US clients who would cut tech budgets in a slowdown",
+                "Indian IT companies import materials from the US that will become more expensive",
+            ],
+            "correct": 2,
+            "explanation_short": (
+                "Indian IT companies like Infosys, TCS, and Wipro earn the majority of their revenue from US clients. "
+                "If US companies face higher costs from tariffs, they cut discretionary spend — including IT outsourcing contracts. "
+                "The risk is second-order: tariffs → US slowdown → lower IT budgets → lower Indian IT revenue."
+            ),
+            "difficulty": 3,
+            "tags": ["tariffs", "it-sector", "global-macro", "us-india"],
+        },
     ],
     "us": [
         {
@@ -237,6 +343,59 @@ _FALLBACK_SCENARIOS: dict[str, list[dict]] = {
             ),
             "difficulty": 2,
             "tags": ["earnings", "nvidia", "ai"],
+        },
+        {
+            "id": "us-fed-first-cut",
+            "market": "us",
+            "context": (
+                "The Federal Reserve cut rates by 50bps — its first cut in 4 years — signalling the start "
+                "of an easing cycle. The S&P 500 initially rallied 1.2%, then gave back gains to close flat. "
+                "Powell said 'we are not declaring victory on inflation.'"
+            ),
+            "question": "Why did the S&P 500 fail to sustain its initial rally after a long-awaited rate cut?",
+            "options": [
+                "Rate cuts always cause stocks to fall in the long run",
+                "The 50bps size spooked investors into thinking the Fed saw a worse economic picture than disclosed",
+                "Stocks always end flat on Fed decision days regardless of the decision",
+                "Powell's statement that inflation was 'fully defeated' removed the need for further cuts",
+            ],
+            "correct": 1,
+            "explanation_short": (
+                "A 50bps cut instead of the expected 25bps raised a question: does the Fed know something bad "
+                "is coming? Markets can interpret aggressive cuts as a sign the central bank is worried about recession, "
+                "not just normalising rates — hence the volatile reaction."
+            ),
+            "media_literacy_note": (
+                "Headlines alternated between 'Fed cuts rates, stocks rally' and 'Stocks give up gains' within hours. "
+                "This is normal price discovery — the initial reaction prices in the decision, "
+                "the reversal prices in the implications."
+            ),
+            "difficulty": 3,
+            "tags": ["fed", "rate-cut", "sp500", "monetary-policy"],
+        },
+        {
+            "id": "us-tariff-volatility",
+            "market": "us",
+            "context": (
+                "The US announced sweeping tariffs of 25% on imports from major trading partners. "
+                "The S&P 500 fell 4.8% — its worst day in two years. "
+                "10-year Treasury yields fell from 4.5% to 4.1% simultaneously."
+            ),
+            "question": "Stocks fell sharply on tariff news, but Treasuries rallied (yields fell). Why do investors typically buy Treasuries when stocks sell off?",
+            "options": [
+                "The US government instructed investors to buy bonds instead of stocks",
+                "Treasuries are a safe haven — in risk-off environments, investors move from equities to bonds, pushing bond prices up and yields down",
+                "Falling yields always accompany falling stocks — they move together",
+                "The Fed immediately lowered rates in response to the sell-off",
+            ],
+            "correct": 1,
+            "explanation_short": (
+                "Treasuries are considered the world's safest asset. In a sell-off, 'flight to safety' drives investors "
+                "out of equities and into bonds — bond prices rise, yields fall. "
+                "This inverse relationship between stocks and Treasuries is a key macro concept."
+            ),
+            "difficulty": 3,
+            "tags": ["tariffs", "treasuries", "safe-haven", "risk-off"],
         },
         {
             "id": "us-cpi-surprise",

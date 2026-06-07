@@ -3,6 +3,14 @@ import { supabase } from '../lib/supabase';
 import type { User, MarketId, LanguageId, TrackId } from '../types';
 import { getPipStage } from '../constants/pip';
 
+const HEART_REFILL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+// Local date in YYYY-MM-DD — uses device timezone, not UTC
+function localDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 interface UserState {
   user: User | null;
   isAuthenticated: boolean;
@@ -11,6 +19,7 @@ interface UserState {
   pendingLanguage: LanguageId;
   completedLessons: string[];
   pendingSkipLessons: string[];
+  perfectLessonsCount: number;
 
   setUser: (user: User) => void;
   clearUser: () => void;
@@ -20,17 +29,19 @@ interface UserState {
   addXP: (amount: number) => void;
   useHeart: () => void;
   refillHearts: () => void;
+  checkAndRefillHearts: () => void;
   incrementStreak: () => void;
   resetStreak: () => void;
   markLessonComplete: (lessonId: string) => void;
   setCompletedLessons: (ids: string[]) => void;
+  incrementPerfectLessons: () => void;
   syncFromServer: (xp: number, level: number, streakDays: number) => void;
   loadProgress: (userId: string) => Promise<void>;
   setPendingSkipLessons: (ids: string[]) => void;
   clearPendingSkipLessons: () => void;
 }
 
-export const useUserStore = create<UserState>((set) => ({
+export const useUserStore = create<UserState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   pendingTrack: 'tradr',
@@ -38,10 +49,16 @@ export const useUserStore = create<UserState>((set) => ({
   pendingLanguage: 'python',
   completedLessons: [],
   pendingSkipLessons: [],
+  perfectLessonsCount: 0,
 
   setUser: (user) => set({ user, isAuthenticated: true }),
 
-  clearUser: () => set({ user: null, isAuthenticated: false, completedLessons: [] }),
+  clearUser: () => set({
+    user: null,
+    isAuthenticated: false,
+    completedLessons: [],
+    perfectLessonsCount: 0,
+  }),
 
   setTrack: (track) =>
     set((state) => ({
@@ -77,11 +94,20 @@ export const useUserStore = create<UserState>((set) => ({
     }),
 
   useHeart: () =>
-    set((state) => ({
-      user: state.user
-        ? { ...state.user, hearts: Math.max(0, state.user.hearts - 1) }
-        : null,
-    })),
+    set((state) => {
+      if (!state.user) return state;
+      const newHearts = Math.max(0, state.user.hearts - 1);
+      return {
+        user: {
+          ...state.user,
+          hearts: newHearts,
+          // Set refill timer the moment hearts hit 0
+          heartsRefillAt: newHearts === 0 && state.user.heartsRefillAt === null
+            ? new Date(Date.now() + HEART_REFILL_MS).toISOString()
+            : state.user.heartsRefillAt,
+        },
+      };
+    }),
 
   refillHearts: () =>
     set((state) => ({
@@ -90,10 +116,24 @@ export const useUserStore = create<UserState>((set) => ({
         : null,
     })),
 
+  checkAndRefillHearts: () => {
+    const { user, refillHearts } = get();
+    if (!user?.heartsRefillAt) return;
+    if (new Date(user.heartsRefillAt) <= new Date()) {
+      refillHearts();
+      if (user.id) {
+        void supabase
+          .from('users')
+          .update({ hearts: 5, hearts_refill_at: null })
+          .eq('id', user.id);
+      }
+    }
+  },
+
   incrementStreak: () =>
     set((state) => {
       if (!state.user) return state;
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDateString();
       if (state.user.lastActive === today) return state;
       return {
         user: {
@@ -118,6 +158,9 @@ export const useUserStore = create<UserState>((set) => ({
 
   setCompletedLessons: (ids) => set({ completedLessons: ids }),
 
+  incrementPerfectLessons: () =>
+    set((state) => ({ perfectLessonsCount: state.perfectLessonsCount + 1 })),
+
   syncFromServer: (xp, level, streakDays) =>
     set((state) => {
       if (!state.user) return state;
@@ -140,11 +183,15 @@ export const useUserStore = create<UserState>((set) => ({
     try {
       const { data } = await supabase
         .from('lesson_progress')
-        .select('lesson_id')
+        .select('lesson_id, perfect')
         .eq('user_id', userId)
         .eq('completed', true);
       if (data) {
-        set({ completedLessons: (data as { lesson_id: string }[]).map((r) => r.lesson_id) });
+        const rows = data as { lesson_id: string; perfect: boolean }[];
+        set({
+          completedLessons:    rows.map((r) => r.lesson_id),
+          perfectLessonsCount: rows.filter((r) => r.perfect).length,
+        });
       }
     } catch {
       // Non-fatal — path map stays at empty state, user can still learn

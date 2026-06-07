@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '../../constants/theme';
 
@@ -16,6 +16,7 @@ interface Props {
 export default function AnswerFooter({ answerState, explanation, disabled, onCheck, onContinue }: Props) {
   const slideAnim = useRef(new Animated.Value(200)).current;
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
 
   useEffect(() => {
     if (answerState !== 'idle') {
@@ -59,7 +60,11 @@ export default function AnswerFooter({ answerState, explanation, disabled, onChe
           style={[
             styles.resultPanel,
             isCorrect ? styles.resultPanelCorrect : styles.resultPanelWrong,
-            { transform: [{ translateY: slideAnim }], paddingBottom: Math.max(spacing.xl, insets.bottom + spacing.md) },
+            {
+              maxHeight: screenHeight * 0.45,
+              transform: [{ translateY: slideAnim }],
+              paddingBottom: Math.max(spacing.xl, insets.bottom + spacing.md),
+            },
           ]}
         >
           <View style={styles.resultHeader}>
@@ -71,7 +76,10 @@ export default function AnswerFooter({ answerState, explanation, disabled, onChe
             </Text>
           </View>
 
-          <Text style={styles.explanation}>{explanation}</Text>
+          {/* Long Claude explanations scroll internally — panel height stays capped so it never overlaps the question/Pip above */}
+          <ScrollView style={styles.explanationScroll} showsVerticalScrollIndicator={false}>
+            <Text style={styles.explanation}>{explanation}</Text>
+          </ScrollView>
 
           <TouchableOpacity
             style={[styles.continueBtn, isCorrect ? styles.continueBtnCorrect : styles.continueBtnWrong]}
@@ -135,6 +143,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
+  },
+  explanationScroll: {
+    flexGrow: 0,
   },
   resultPanelCorrect: { backgroundColor: '#D7FFB8' },
   resultPanelWrong:   { backgroundColor: '#FFDFE0' },
