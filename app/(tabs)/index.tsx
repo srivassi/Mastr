@@ -81,9 +81,10 @@ export default function LearnScreen() {
   const setMarket               = useUserStore((s) => s.setMarket);
   const setLanguage             = useUserStore((s) => s.setLanguage);
   const setTrack                = useUserStore((s) => s.setTrack);
-  const pendingSkipLessons      = useUserStore((s) => s.pendingSkipLessons);
-  const clearPendingSkipLessons = useUserStore((s) => s.clearPendingSkipLessons);
-  const setCompletedLessons     = useUserStore((s) => s.setCompletedLessons);
+  const pendingSkipLessons       = useUserStore((s) => s.pendingSkipLessons);
+  const clearPendingSkipLessons  = useUserStore((s) => s.clearPendingSkipLessons);
+  const setCompletedLessons      = useUserStore((s) => s.setCompletedLessons);
+  const checkAndRefillHearts     = useUserStore((s) => s.checkAndRefillHearts);
   const [selectedNode, setSelectedNode] = useState<PathNodeType | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -115,6 +116,9 @@ export default function LearnScreen() {
   const streak = user?.streakDays ?? 0;
   const hearts = user?.hearts     ?? 5;
   const xp     = user?.xp         ?? 0;
+
+  // Check heart refill each time the Learn tab is focused
+  useEffect(() => { checkAndRefillHearts(); }, []);
 
   // Write placement-skip lessons to Supabase on first load after signup
   useEffect(() => {

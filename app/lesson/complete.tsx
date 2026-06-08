@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Animated, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Modal, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Pip from '../../components/pip/Pip';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,28 +8,80 @@ import { useUserStore } from '../../store/userStore';
 import { QUIZ_PASS_THRESHOLD } from '../../lib/curriculum';
 import { completeLesson } from '../../lib/api';
 import { SHARED_LESSON_IDS } from '../../lib/curriculum';
+import { PIP_STAGES, getPipStage } from '../../constants/pip';
 import { supabase } from '../../lib/supabase';
 
-interface Message { heading: string; sub: string; pip: string }
+// Local date in YYYY-MM-DD using device timezone
+function localDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+interface Message { heading: string; sub: string }
 
 function getMessage(accuracy: number, perfect: boolean): Message {
-  if (perfect)        return { heading: 'You crushed it!',       sub: 'Perfect score. Pip is impressed.',          pip: '🐻🔥' };
-  if (accuracy >= 80) return { heading: 'Smashed it!',           sub: 'Almost perfect — you\'re getting this.',    pip: '🐻💪' };
-  if (accuracy >= 60) return { heading: 'Solid effort!',         sub: 'A few slipped by. One more run?',           pip: '🐻👍' };
-  if (accuracy >= 40) return { heading: 'Keep going!',           sub: 'The market is patient. So is Pip.',         pip: '🐻📚' };
-  return               { heading: 'Every expert started here.',  sub: 'Pip believes in you — try again.',          pip: '🐻🌱' };
+  if (perfect)         return { heading: 'You crushed it!',      sub: 'Perfect score. Pip is impressed.' };
+  if (accuracy >= 80)  return { heading: 'Smashed it!',          sub: "Almost perfect — you're getting this." };
+  if (accuracy >= 60)  return { heading: 'Solid effort!',        sub: 'A few slipped by. One more run?' };
+  if (accuracy >= 40)  return { heading: 'Keep going!',          sub: 'The market is patient. So is Pip.' };
+  return                { heading: 'Every expert started here.', sub: 'Pip believes in you — try again.' };
 }
+
+// ─── Level-up overlay ────────────────────────────────────────────────────────
+
+function LevelUpModal({ newStage, level, onDismiss }: {
+  newStage: keyof typeof PIP_STAGES;
+  level: number;
+  onDismiss: () => void;
+}) {
+  const stage = PIP_STAGES[newStage];
+  const scaleAnim = useRef(new Animated.Value(0.6)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 55, friction: 6 }),
+      Animated.timing(opacityAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Modal transparent animationType="fade" onRequestClose={onDismiss}>
+      <View style={lvlStyles.overlay}>
+        <Animated.View style={[lvlStyles.card, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
+          <View style={[lvlStyles.pipBg, { borderColor: stage.tint }]}>
+            <Pip level={level} mood="levelup" size={140} />
+          </View>
+          <Text style={lvlStyles.title}>PIP EVOLVED!</Text>
+          <Text style={[lvlStyles.stageName, { color: stage.tint }]}>{stage.label}</Text>
+          <Text style={lvlStyles.sub}>Level {level} reached</Text>
+          <TouchableOpacity
+            style={[lvlStyles.btn, { backgroundColor: stage.tint }]}
+            onPress={onDismiss}
+            activeOpacity={0.8}
+            accessibilityLabel="Dismiss level up"
+          >
+            <Text style={lvlStyles.btnText}>AMAZING!</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function LessonCompleteScreen() {
   const { lessonId, isQuiz, xp, correct, total } = useLocalSearchParams<{
     lessonId: string; isQuiz: string; xp: string; correct: string; total: string;
   }>();
 
-  const user               = useUserStore((s) => s.user);
-  const markLessonComplete = useUserStore((s) => s.markLessonComplete);
-  const incrementStreak    = useUserStore((s) => s.incrementStreak);
-  const addXP              = useUserStore((s) => s.addXP);
-  const syncFromServer     = useUserStore((s) => s.syncFromServer);
+  const user                  = useUserStore((s) => s.user);
+  const markLessonComplete    = useUserStore((s) => s.markLessonComplete);
+  const incrementStreak       = useUserStore((s) => s.incrementStreak);
+  const addXP                 = useUserStore((s) => s.addXP);
+  const syncFromServer        = useUserStore((s) => s.syncFromServer);
+  const incrementPerfectLessons = useUserStore((s) => s.incrementPerfectLessons);
 
   const xpNum      = Number(xp ?? 0);
   const correctNum = Number(correct ?? 0);
@@ -39,65 +91,81 @@ export default function LessonCompleteScreen() {
 
   const quizPassed = isQuiz !== 'true' || accuracy / 100 >= QUIZ_PASS_THRESHOLD;
 
+  // Track pip stage before the server sync so we can detect a stage change
+  const prevPipStageRef = useRef(user?.pipStage ?? 'bear');
+  const [levelUpStage, setLevelUpStage] = useState<keyof typeof PIP_STAGES | null>(null);
+
+  // Detect stage change after syncFromServer updates the store
   useEffect(() => {
-    if (!quizPassed || !lessonId) return;
+    if (!user?.pipStage) return;
+    if (user.pipStage !== prevPipStageRef.current) {
+      setLevelUpStage(user.pipStage as keyof typeof PIP_STAGES);
+    }
+    prevPipStageRef.current = user.pipStage;
+  }, [user?.pipStage]);
+
+  useEffect(() => {
+    if (!quizPassed || !lessonId || !user?.id) return;
+
     markLessonComplete(lessonId);
+    if (perfect) incrementPerfectLessons();
+
+    const lessonMarket = SHARED_LESSON_IDS.has(lessonId) ? 'shared' : user.market ?? 'india';
+
+    // Always write lesson_progress directly — never rely solely on the backend
+    void supabase.from('lesson_progress').upsert({
+      user_id:      user.id,
+      lesson_id:    lessonId,
+      track:        user.track ?? 'tradr',
+      market:       lessonMarket,
+      completed:    true,
+      score:        correctNum,
+      xp_earned:    xpNum,
+      perfect,
+      completed_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,lesson_id' });
+
+    // Try backend for XP/streak — falls back to direct Supabase write if unreachable
     void (async () => {
       try {
-        const lessonMarket = SHARED_LESSON_IDS.has(lessonId) ? 'shared' : user?.market ?? 'india';
         const result = await completeLesson(lessonId, {
           xp_earned: xpNum,
           correct:   correctNum,
           total:     totalNum,
           perfect,
           is_quiz:   isQuiz === 'true',
-          track:     user?.track ?? 'tradr',
+          track:     user.track ?? 'tradr',
           market:    lessonMarket,
         });
         syncFromServer(result.new_xp, result.new_level, result.streak_days);
       } catch {
-        // Backend unreachable — update local state and write directly to Supabase
+        // Backend unreachable — compute and persist XP/streak locally
+        const newXP     = user.xp + xpNum;
+        const newLevel  = Math.min(Math.floor(newXP / 100) + 1, 50);
+        const today     = localDateString();
+        const newStreak = user.lastActive === today ? user.streakDays : user.streakDays + 1;
         addXP(xpNum);
         incrementStreak();
-        if (user?.id) {
-          const newXP    = user.xp + xpNum;
-          const newLevel = Math.min(Math.floor(newXP / 100) + 1, 50);
-          const today    = new Date().toISOString().split('T')[0];
-          const newStreak = user.lastActive === today ? user.streakDays : user.streakDays + 1;
-
-          await Promise.all([
-            supabase.from('lesson_progress').upsert({
-              user_id:      user.id,
-              lesson_id:    lessonId,
-              track:        user.track ?? 'tradr',
-              market:       user.market ?? 'india',
-              completed:    true,
-              score:        correctNum,
-              xp_earned:    xpNum,
-              perfect,
-              completed_at: new Date().toISOString(),
-            }, { onConflict: 'user_id,lesson_id' }),
-            supabase.from('users').update({
-              xp:          newXP,
-              level:       newLevel,
-              streak_days: newStreak,
-              last_active: today,
-            }).eq('id', user.id),
-          ]);
-        }
+        void supabase.from('users').update({
+          xp:          newXP,
+          level:       newLevel,
+          pip_stage:   getPipStage(newLevel),
+          streak_days: newStreak,
+          last_active: today,
+        }).eq('id', user.id);
       }
     })();
   }, [lessonId, quizPassed]);
 
   const msg = isQuiz === 'true' && !quizPassed
-    ? { heading: 'Not quite — try again!', sub: `You need ${Math.round(QUIZ_PASS_THRESHOLD * 100)}% to pass the quiz. Give it another go.`, pip: '🐻📖' }
+    ? { heading: 'Not quite — try again!', sub: `You need ${Math.round(QUIZ_PASS_THRESHOLD * 100)}% to pass the quiz.` }
     : getMessage(accuracy, perfect);
 
   // Animations
-  const pipScale      = useRef(new Animated.Value(0)).current;
-  const contentSlide  = useRef(new Animated.Value(24)).current;
+  const pipScale       = useRef(new Animated.Value(0)).current;
+  const contentSlide   = useRef(new Animated.Value(24)).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
-  const xpScale       = useRef(new Animated.Value(0.6)).current;
+  const xpScale        = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -117,14 +185,19 @@ export default function LessonCompleteScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.inner}>
+      {levelUpStage && (
+        <LevelUpModal
+          newStage={levelUpStage}
+          level={user?.level ?? 1}
+          onDismiss={() => setLevelUpStage(null)}
+        />
+      )}
 
-        {/* Pip hero */}
+      <View style={styles.inner}>
         <Animated.View style={[styles.pipBg, { transform: [{ scale: pipScale }] }]}>
           <Pip level={user?.level ?? 1} mood="celebrate" size={120} />
         </Animated.View>
 
-        {/* Heading + sub */}
         <Animated.View style={[
           styles.textBlock,
           { opacity: contentOpacity, transform: [{ translateY: contentSlide }] },
@@ -133,20 +206,16 @@ export default function LessonCompleteScreen() {
           <Text style={styles.sub}>{msg.sub}</Text>
         </Animated.View>
 
-        {/* XP badge */}
         <Animated.View style={[styles.xpBadge, { transform: [{ scale: xpScale }], opacity: contentOpacity }]}>
           <Text style={styles.xpText}>+{xpNum} XP ⚡</Text>
         </Animated.View>
 
-        {/* Stats */}
         <Animated.View style={[styles.stats, { opacity: contentOpacity }]}>
-          <Stat label="Accuracy" value={`${accuracy}%`}          color={accuracy >= 80 ? colors.primary : colors.textPrimary} />
+          <Stat label="Accuracy" value={`${accuracy}%`}            color={accuracy >= 80 ? colors.primary : colors.textPrimary} />
           <Stat label="Correct"  value={`${correctNum}/${totalNum}`} color={colors.textPrimary} />
         </Animated.View>
-
       </View>
 
-      {/* Footer button — outside animated area so it's always tappable */}
       <View style={styles.footer}>
         {!quizPassed ? (
           <TouchableOpacity
@@ -190,7 +259,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.lg,
   },
-
   pipBg: {
     width: 160,
     height: 160,
@@ -199,8 +267,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pip: { fontSize: 80, textAlign: 'center' },
-
   textBlock: { alignItems: 'center', gap: spacing.xs },
   heading: {
     fontSize: typography.xxl,
@@ -214,7 +280,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-
   xpBadge: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.xl,
@@ -232,12 +297,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     letterSpacing: 0.5,
   },
-
-  stats: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    width: '100%',
-  },
+  stats: { flexDirection: 'row', gap: spacing.md, width: '100%' },
   stat: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -254,11 +314,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
   },
-  statValue: {
-    fontSize: typography.xl,
-    fontWeight: '900',
-  },
-
+  statValue: { fontSize: typography.xl, fontWeight: '900' },
   footer: {
     padding: spacing.lg,
     paddingBottom: spacing.lg,
@@ -280,6 +336,68 @@ const styles = StyleSheet.create({
   btnText: {
     fontSize: typography.lg,
     fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 1,
+  },
+});
+
+// ─── Level-up modal styles ────────────────────────────────────────────────────
+
+const lvlStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  card: {
+    backgroundColor: colors.background,
+    borderRadius: 28,
+    padding: spacing.xl,
+    alignItems: 'center',
+    width: '100%',
+    gap: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  pipBg: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: '#FFF8F0',
+    borderWidth: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    letterSpacing: 1,
+  },
+  stageName: {
+    fontSize: typography.xl,
+    fontWeight: '800',
+  },
+  sub: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+  },
+  btn: {
+    marginTop: spacing.sm,
+    paddingVertical: 16,
+    paddingHorizontal: spacing.xl * 2,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  btnText: {
+    fontSize: typography.lg,
+    fontWeight: '900',
     color: '#fff',
     letterSpacing: 1,
   },

@@ -14,7 +14,8 @@ export type PipMood =
   | 'celebrate'
   | 'levelup'
   | 'sleeping'
-  | 'thinking';
+  | 'thinking'
+  | 'wild';    // Excited, alert — used on In the Wild card
 
 export function getPipStage(level: number): PipStage {
   if (level <= 10) return 'bear';

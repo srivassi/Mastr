@@ -14,7 +14,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const setUser = useUserStore((s) => s.setUser);
+  const setUser        = useUserStore((s) => s.setUser);
+  const loadProgress   = useUserStore((s) => s.loadProgress);
 
   async function handleLogin() {
     setError(null);
@@ -107,6 +108,7 @@ export default function LoginScreen() {
           heartsRefillAt: p.hearts_refill_at,
           league:         p.league as League,
         } satisfies User);
+        await loadProgress(p.id);
       }
 
       router.replace('/(tabs)');
